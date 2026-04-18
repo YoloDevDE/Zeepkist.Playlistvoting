@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Profile – Zeepkist Playlist Voting</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        steam: {
+                            dark: '#1b2838',
+                            mid: '#16202d',
+                            card: '#1e2d3d',
+                            border: '#2a475e',
+                            accent: '#66c0f4',
+                            muted: '#8f98a0'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-steam-dark min-h-screen text-gray-300 font-sans">
+
+<!-- Navbar -->
+<nav class="bg-steam-mid border-b border-steam-border px-6 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-6">
+        <span class="text-white font-bold text-lg">🎮 Zeepkist Voting</span>
+        <a class="text-steam-muted hover:text-white text-sm transition-colors"
+           href="/zeepkist/playlistvoting/dashboard">Dashboard</a>
+        <a class="text-steam-accent text-sm font-medium" href="/zeepkist/playlistvoting/profile">Profile</a>
+    </div>
+    <div class="flex items-center gap-4">
+        <span class="text-sm text-steam-muted">Logged in as
+            <span class="text-white font-semibold" th:text="${steamName}">Player</span>
+        </span>
+        <a class="text-xs text-steam-muted hover:text-red-400 transition-colors"
+           href="/zeepkist/playlistvoting/auth/logout">Logout</a>
+    </div>
+</nav>
+
+<main class="max-w-2xl mx-auto px-4 py-8 flex flex-col gap-8">
+
+    <!-- Token -->
+    <section class="bg-steam-mid border border-steam-border rounded-lg p-6">
+        <h2 class="text-steam-muted text-xs uppercase tracking-widest mb-4">Your Token</h2>
+
+        <!-- Identity -->
+        <div class="flex items-center gap-3 mb-4 bg-steam-dark border border-steam-border rounded px-4 py-3">
+            <div class="flex flex-col">
+                <span class="text-white text-sm font-semibold" th:text="${steamName}">Player</span>
+                <span class="text-steam-muted text-xs font-mono" th:text="${steamId}">76561198xxxxxxxxx</span>
+            </div>
+        </div>
+
+        <p class="text-xs text-steam-muted mb-3">Use this token in your Nightbot / chatbot commands.</p>
+
+        <div class="flex items-stretch border border-steam-border rounded overflow-hidden">
+            <span class="flex-1 bg-steam-dark text-steam-accent font-mono text-sm px-4 py-2 break-all blur-sm select-none transition-all duration-200"
+                  id="tokenValue"
+                  th:text="${token}"></span>
+
+            <!-- Eye toggle -->
+            <button class="bg-steam-border text-white px-3 hover:brightness-125 transition-all border-l border-steam-dark flex items-center"
+                    onclick="toggleToken()"
+                    title="Show/hide token">
+                <svg class="w-4 h-4" fill="none" id="iconEye" stroke="currentColor" stroke-width="1.5"
+                     viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.641 0-8.573-3.007-9.964-7.178Z"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"/>
+                    <path d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <svg class="w-4 h-4 hidden" fill="none" id="iconEyeSlash" stroke="currentColor"
+                     stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"/>
+                </svg>
+            </button>
+
+            <!-- Copy -->
+            <button class="bg-steam-border text-white text-xs px-4 hover:brightness-125 transition-all whitespace-nowrap border-l border-steam-dark"
+                    onclick="copyToken()">
+                Copy
+            </button>
+
+            <!-- Refresh -->
+            <form action="/zeepkist/playlistvoting/profile/token/refresh" class="flex" method="post">
+                <button class="bg-steam-border text-white px-3 hover:brightness-125 transition-all border-l border-steam-dark flex items-center"
+                        onclick="return confirm('Generate a new token? Your old token will stop working immediately.')"
+                        title="Regenerate token"
+                        type="submit">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5"
+                         viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </form>
+        </div>
+        <p class="text-xs text-red-400 mt-2">⚠ Regenerating your token will invalidate all existing chatbot commands
+            using the old token.</p>
+    </section>
+
+    <!-- Managers -->
+    <section class="bg-steam-mid border border-steam-border rounded-lg p-6">
+        <h2 class="text-steam-muted text-xs uppercase tracking-widest mb-1">Managers</h2>
+        <p class="text-xs text-steam-muted mb-4">
+            Managers can use their own token to operate your session (e.g. a co-host).
+        </p>
+
+        <!-- Manager list -->
+        <div class="text-steam-muted italic text-sm mb-4" th:if="${#lists.isEmpty(managers)}">No managers added yet.
+        </div>
+        <div class="flex flex-col gap-2 mb-4">
+            <div class="flex items-center justify-between bg-steam-dark border border-steam-border rounded px-4 py-2"
+                 th:each="m : ${managers}">
+                <div class="flex flex-col">
+                    <span class="text-white text-sm font-medium" th:text="${m.steamName}">Name</span>
+                    <span class="text-steam-muted text-xs font-mono" th:text="${m.steamId}">SteamID</span>
+                </div>
+                <form action="/zeepkist/playlistvoting/profile/manager/remove" method="post">
+                    <input th:name="${_csrf.parameterName}" th:value="${_csrf.token}" type="hidden"/>
+                    <input name="steamId" th:value="${m.steamId}" type="hidden"/>
+                    <button class="text-xs text-red-400 hover:text-red-300 transition-colors" type="submit">Remove
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Add manager -->
+        <form action="/zeepkist/playlistvoting/profile/manager/add" class="flex gap-3" method="post">
+            <input th:name="${_csrf.parameterName}" th:value="${_csrf.token}" type="hidden"/>
+            <input class="flex-1 bg-steam-dark border border-steam-border rounded px-4 py-2 text-white text-sm placeholder-steam-muted focus:outline-none focus:border-steam-accent"
+                   name="steamId" placeholder="Steam ID (e.g. 76561198xxxxxxxxx)"
+                   type="text"/>
+            <button class="bg-steam-accent text-steam-dark font-semibold text-sm px-5 py-2 rounded hover:brightness-110 transition-all"
+                    type="submit">
+                Add
+            </button>
+        </form>
+    </section>
+
+</main>
+
+<script>
+    let tokenVisible = false;
+
+    function toggleToken() {
+        tokenVisible = !tokenVisible;
+        const el = document.getElementById('tokenValue');
+        const iconEye = document.getElementById('iconEye');
+        const iconEyeSlash = document.getElementById('iconEyeSlash');
+        if (tokenVisible) {
+            el.classList.remove('blur-sm', 'select-none');
+            iconEye.classList.add('hidden');
+            iconEyeSlash.classList.remove('hidden');
+        } else {
+            el.classList.add('blur-sm', 'select-none');
+            iconEye.classList.remove('hidden');
+            iconEyeSlash.classList.add('hidden');
+        }
+    }
+
+    function copyToken() {
+        const val = document.getElementById('tokenValue').textContent.trim();
+        navigator.clipboard.writeText(val).then(() => {
+            const btn = document.querySelector('button[onclick="copyToken()"]');
+            btn.textContent = 'Copied!';
+            setTimeout(() => btn.textContent = 'Copy', 2000);
+        });
+    }
+</script>
+</body>
+</html>
