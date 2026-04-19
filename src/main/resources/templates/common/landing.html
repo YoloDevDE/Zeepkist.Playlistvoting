@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout/main-layout :: head('YoloDev - Home')}"></head>
+<body th:replace="~{layout/main-layout :: layout('Home', ~{:: .content-slot}, _)}">
+
+<div class="content-slot w-full">
+    <!-- Hero Section -->
+    <div class="text-center mb-16 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+        <h1 class="text-5xl md:text-7xl font-black mb-6 tracking-tight bg-gradient-to-r from-white via-brand-accent to-brand-muted bg-clip-text text-transparent">
+            Yolo Bolo
+        </h1>
+        <p class="text-xl text-brand-muted max-w-2xl mx-auto leading-relaxed">
+            Hi <span class="text-brand-accent font-semibold" th:if="${displayName}" th:text="${displayName}">User</span>,
+            I'm <span class="text-brand-accent font-semibold">Yolo</span>.
+            Here you can find my tools and apps for the Zeepkist community.
+        </p>
+    </div>
+
+    <!-- Apps Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 px-4">
+        <!-- Playlist Voting App -->
+        <a class="group relative bg-brand-card border border-slate-800 rounded-2xl p-8 hover:border-brand-accent/50 transition-all hover:shadow-2xl hover:shadow-brand-accent/10 hover:-translate-y-1 overflow-hidden"
+           href="/playlistvoting/dashboard">
+            <div class="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
+                <!-- Racing Flags Icon -->
+                <svg class="w-24 h-24" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                     xmlns="http://www.w3.org/2000/svg">
+                    <path d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"
+                          stroke-linecap="round" stroke-linejoin="round"
+                          stroke-width="2"/>
+                </svg>
+            </div>
+            <div class="relative z-10">
+                <div class="w-12 h-12 bg-brand-accent/10 rounded-xl flex items-center justify-center mb-6 border border-brand-accent/20">
+                    <svg class="h-6 w-6 text-brand-accent" fill="none" stroke="currentColor"
+                         viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                              stroke-linecap="round" stroke-linejoin="round"
+                              stroke-width="2"/>
+                    </svg>
+                </div>
+                <h3 class="text-2xl font-bold mb-3">Playlist Voting</h3>
+                <p class="text-brand-muted text-sm leading-relaxed mb-6">
+                    Vote for your favorite levels in Zeepkist. Organize playlists and let the community
+                    decide.
+                </p>
+                <div class="flex items-center text-brand-accent font-semibold text-sm group-hover:gap-2 transition-all">
+                    Open App
+                    <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                        <path clip-rule="evenodd"
+                              d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z"
+                              fill-rule="evenodd"/>
+                    </svg>
+                </div>
+            </div>
+        </a>
+
+        <!-- Placeholder for future apps -->
+        <div class="bg-slate-900/30 border border-slate-800/50 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center opacity-50">
+            <div class="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center mb-4">
+                <svg class="h-6 w-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                     xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 6v6m0 0v6m0-6h6m-6 0H6" stroke-linecap="round" stroke-linejoin="round"
+                          stroke-width="2"/>
+                </svg>
+            </div>
+            <span class="text-slate-500 font-medium">Coming Soon</span>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

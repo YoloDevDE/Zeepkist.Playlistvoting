@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:fragment="head(title)">
+    <meta charset="UTF-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title th:text="${title}">YoloDev</title>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            dark: '#0a0f1e',
+                            card: '#161d31',
+                            accent: '#38bdf8',
+                            muted: '#94a3b8'
+                        },
+                        steam: {dark: '#1b2838', mid: '#16202d', border: '#2a475e', accent: '#66c0f4', muted: '#8f98a0'}
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-brand-dark min-h-screen text-white flex flex-col font-sans" th:fragment="layout(title, content, extra)">
+
+<!-- Header -->
+<header th:replace="~{components/navigation :: header}"></header>
+
+<!-- Main Content -->
+<main class="flex-grow flex flex-col items-center py-10 px-4">
+    <div class="w-full max-w-6xl mx-auto">
+        <div th:replace="${content}"></div>
+    </div>
+</main>
+
+<!-- Extra elements (Modals, etc) -->
+<div th:if="${extra != null}" th:replace="${extra}"></div>
+
+<!-- Footer -->
+<footer th:replace="~{components/footer :: footer}"></footer>
+
+</body>
+</html>

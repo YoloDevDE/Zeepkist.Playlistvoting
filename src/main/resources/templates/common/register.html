@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout/main-layout :: head('Registration')}"></head>
+<body th:replace="~{layout/main-layout :: layout('Register', ~{:: .content-slot}, _)}">
+
+<div class="content-slot w-full max-w-md mx-auto">
+    <div class="bg-brand-card border border-slate-800 rounded-3xl p-10 shadow-2xl relative overflow-hidden">
+        <!-- Glow effect -->
+        <div class="absolute -top-24 -right-24 w-48 h-48 bg-brand-accent/10 blur-3xl rounded-full"></div>
+
+        <div class="text-center mb-10">
+            <h1 class="text-3xl font-black mb-2 tracking-tight">New Account</h1>
+            <p class="text-brand-muted text-sm">Join the Zeepkist community</p>
+        </div>
+
+        <form class="space-y-6" method="post" th:action="@{/register}">
+            <div class="space-y-2">
+                <label class="text-xs font-bold uppercase tracking-widest text-slate-500 ml-1">Username</label>
+                <input class="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent/30 transition-all"
+                       name="displayName"
+                       placeholder="Your name"
+                       required type="text">
+            </div>
+            <div class="space-y-2">
+                <label class="text-xs font-bold uppercase tracking-widest text-slate-500 ml-1">Email</label>
+                <input class="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent/30 transition-all"
+                       name="email"
+                       placeholder="name@example.com"
+                       required type="email">
+            </div>
+            <div class="space-y-2">
+                <label class="text-xs font-bold uppercase tracking-widest text-slate-500 ml-1">Password</label>
+                <input class="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent/30 transition-all"
+                       name="password"
+                       placeholder="••••••••"
+                       required type="password">
+            </div>
+
+            <button class="w-full bg-brand-accent text-brand-dark font-bold py-4 rounded-xl hover:bg-brand-accent/80 transition-all shadow-lg shadow-brand-accent/20"
+                    type="submit">
+                Create Account
+            </button>
+        </form>
+
+        <div class="mt-10 pt-8 border-t border-slate-800 text-center space-y-4">
+            <p class="text-sm text-brand-muted">
+                Already registered? <a
+                    class="text-brand-accent hover:underline decoration-2 underline-offset-4 font-semibold"
+                    href="/login">Log in now</a>
+            </p>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

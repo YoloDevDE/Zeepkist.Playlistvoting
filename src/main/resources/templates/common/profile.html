@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout/main-layout :: head('Profile - ' + ${username})}"></head>
+<body th:replace="~{layout/main-layout :: layout('Profile', ~{:: .content-slot}, _)}">
+
+<div class="content-slot w-full max-w-4xl mx-auto">
+    <div class="bg-brand-card border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+        <div class="h-32 bg-gradient-to-r from-brand-accent/20 to-purple-500/20"></div>
+        <div class="px-8 pb-8">
+            <div class="relative flex justify-between items-end -mt-12 mb-6">
+                <div class="p-1 bg-brand-dark rounded-2xl">
+                    <div class="w-24 h-24 bg-brand-accent rounded-xl flex items-center justify-center text-4xl font-black text-brand-dark shadow-xl">
+                        <span th:text="${#strings.substring(displayName != null ? displayName : username, 0,1).toUpperCase()}">U</span>
+                    </div>
+                </div>
+                <div class="pb-2">
+                    <span class="px-3 py-1 bg-green-500/10 text-green-400 text-xs font-bold rounded-full border border-green-500/20 uppercase tracking-wider">Active</span>
+                </div>
+            </div>
+
+            <h1 class="text-3xl font-bold mb-1" th:text="${displayName != null ? displayName : username}">Username</h1>
+            <p class="text-brand-muted text-sm mb-8" th:text="${username}">user@example.com</p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="p-6 bg-slate-900/50 rounded-xl border border-slate-800">
+                    <h3 class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-4">Account Details</h3>
+                    <div class="space-y-3">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-slate-500">Username</span>
+                            <span class="font-mono text-brand-accent" th:text="${username}">yolo@example.com</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-slate-500">Steam Linked</span>
+                            <span class="text-green-400 font-bold" th:if="${steamId != null}" th:text="${steamName}">Linked</span>
+                            <span class="text-red-400" th:unless="${steamId != null}">Not Linked</span>
+                        </div>
+                        <div class="flex justify-between text-sm" th:if="${token != null}">
+                            <span class="text-slate-500">Host Token</span>
+                            <span class="font-mono text-brand-accent" th:text="${token}">ABC-123</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-6 bg-slate-900/50 rounded-xl border border-slate-800">
+                    <h3 class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-4">Host Management</h3>
+                    <div class="space-y-4" th:if="${host != null}">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-slate-500">Refresh Token</span>
+                            <form method="post" th:action="@{/profile/token/refresh}">
+                                <button class="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1 rounded border border-slate-700 transition-all"
+                                        type="submit">
+                                    Refresh
+                                </button>
+                            </form>
+                        </div>
+                        <div class="space-y-2" th:if="${not #lists.isEmpty(managers)}">
+                            <p class="text-xs font-bold text-slate-500 uppercase tracking-widest">Managers</p>
+                            <div class="flex items-center justify-between bg-brand-dark/50 p-2 rounded border border-slate-800"
+                                 th:each="m : ${managers}">
+                                <span class="text-xs" th:text="${m.steamName}">Manager Name</span>
+                                <form method="post" th:action="@{/profile/manager/remove}">
+                                    <input name="steamId" th:value="${m.steamId}" type="hidden">
+                                    <button class="text-red-400 hover:text-red-300" type="submit">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                                  stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
+                                        </svg>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        <form class="flex gap-2" method="post" th:action="@{/profile/manager/add}">
+                            <input class="flex-grow bg-brand-dark border border-slate-700 rounded px-2 py-1 text-xs focus:outline-none focus:border-brand-accent" name="steamId" placeholder="SteamID64"
+                                   type="text">
+                            <button class="bg-brand-accent text-brand-dark px-3 py-1 rounded text-xs font-bold hover:bg-brand-accent/80 transition-all"
+                                    type="submit">
+                                Add Manager
+                            </button>
+                        </form>
+                    </div>
+                    <div class="flex flex-col items-center justify-center h-full text-center"
+                         th:unless="${host != null}">
+                        <p class="text-sm text-brand-muted mb-4">No host profile found. Link Steam to manage
+                            sessions.</p>
+                        <a class="bg-brand-accent text-brand-dark px-4 py-2 rounded-lg text-sm font-bold hover:bg-brand-accent/80 transition-all"
+                           href="/auth/steam">Link
+                            Steam</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-8 pt-8 border-t border-slate-800 flex justify-between items-center">
+                <p class="text-xs text-brand-muted">Zeepkist Playlist Voting Host Management</p>
+                <a class="px-6 py-2 bg-brand-accent text-brand-dark rounded-lg transition-all text-sm font-bold hover:scale-105"
+                   href="/playlistvoting/dashboard">
+                    To Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>
