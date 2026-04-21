@@ -186,20 +186,34 @@
         }
 
         function renderDashboard(data) {
-            renderActiveLevel(data.currentLevel, data.currentVotes);
+            renderActiveLevel(data.currentLevel, data.currentVotes, data.activeSessionName);
             renderSessions(data.sessions);
         }
 
-        function renderActiveLevel(level, votes) {
+        function renderActiveLevel(level, votes, activeSessionName) {
             const $panel = $('#activeLevelPanel');
             if (!$panel.length) return;
+
+            if (!activeSessionName) {
+                $panel.html(`
+                    <div class="bg-brand-card border border-slate-800 rounded-2xl p-8 shadow-xl text-center">
+                        <p class="text-brand-muted font-bold uppercase tracking-widest text-xs mb-2">Active Session</p>
+                        <h2 class="text-2xl font-black text-slate-500">NO ACTIVE SESSION</h2>
+                        <p class="text-slate-600 text-xs mt-2 italic">Activate a session below to start voting</p>
+                    </div>
+                `);
+                return;
+            }
 
             if (!level) {
                 $panel.html(`
                     <div class="bg-brand-card border border-slate-800 rounded-2xl p-8 shadow-xl text-center">
-                        <p class="text-brand-muted font-bold uppercase tracking-widest text-xs mb-2">Active Level</p>
-                        <h2 class="text-2xl font-black text-slate-500">NO ACTIVE LEVEL</h2>
-                        <p class="text-slate-600 text-xs mt-2 italic">Start a vote in Zeepkist to see it here</p>
+                        <div class="flex flex-col items-center">
+                            <p class="text-brand-accent font-bold uppercase tracking-widest text-xs mb-1">Active Session: ${activeSessionName}</p>
+                            <div class="h-px w-24 bg-brand-accent/20 mb-4"></div>
+                            <h2 class="text-2xl font-black text-slate-500 uppercase">No active map</h2>
+                            <p class="text-slate-600 text-xs mt-2 italic">Start a vote in Zeepkist to see it here</p>
+                        </div>
                     </div>
                 `);
                 return;
@@ -231,6 +245,11 @@
                     <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                         <svg class="w-24 h-24" fill="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                     </div>
+                    <div class="mb-4">
+                        <p class="text-brand-muted font-bold uppercase tracking-widest text-[10px] mb-1">Active Session</p>
+                        <h3 class="text-xl font-black text-white">${activeSessionName}</h3>
+                    </div>
+                    <div class="h-px w-full bg-slate-800 mb-6"></div>
                     <p class="text-brand-accent font-bold uppercase tracking-widest text-xs mb-2 flex items-center gap-2">
                         <span class="relative flex h-2 w-2">
                           <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-accent opacity-75"></span>
@@ -293,6 +312,11 @@
                                 </a>
                                 
                                 <div class="flex bg-slate-900/50 rounded-xl p-1 border border-slate-800">
+                                    <button onclick="renameSession('${session.id}', '${session.name}')"
+                                            class="p-2 hover:bg-slate-800 text-slate-500 hover:text-brand-accent rounded-lg transition-colors"
+                                            title="Rename">
+                                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    </button>
                                     <button onclick="updateState('${session.id}', '${isActive ? 'PAUSED' : 'ACTIVE'}')" 
                                             class="p-2 hover:bg-slate-800 rounded-lg transition-colors ${isActive ? 'text-yellow-500' : 'text-green-500'}"
                                             title="${isActive ? 'Pause' : 'Start'}">
@@ -406,6 +430,20 @@
                 data: JSON.stringify({state: state}),
                 success: fetchDashboardData,
                 error: function() { alert('Failed to update session state'); }
+            });
+        }
+
+        function renameSession(id, currentName) {
+            const newName = prompt('Enter new session name:', currentName);
+            if (newName === null || newName === currentName || newName.trim() === '') return;
+
+            $.ajax({
+                url: `/playlistvoting/dashboard/session/${id}/rename`,
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({name: newName}),
+                success: fetchDashboardData,
+                error: function() { alert('Failed to rename session'); }
             });
         }
 

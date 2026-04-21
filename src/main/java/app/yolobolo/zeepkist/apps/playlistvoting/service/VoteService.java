@@ -55,11 +55,14 @@ public class VoteService {
             log.warn("No user found for token: {}", token);
             return null;
         }
-        return zkSessionRepo.findByHostId(user.getId())
-                .stream()
-                .filter(s -> s.getState() == SessionState.ACTIVE || s.getState() == SessionState.PAUSED)
+        List<ZkSession> sessions = zkSessionRepo.findByHostId(user.getId());
+        return sessions.stream()
+                .filter(s -> s.getState() == SessionState.ACTIVE)
                 .findFirst()
-                .orElse(null);
+                .orElseGet(() -> sessions.stream()
+                        .filter(s -> s.getState() == SessionState.PAUSED)
+                        .findFirst()
+                        .orElse(null));
     }
 
     public ZkSession createSession(String token, String displayName) {
@@ -74,6 +77,7 @@ public class VoteService {
         for (ZkSession s : otherSessions) {
             if (s.getState() != SessionState.FINISHED) {
                 s.setState(SessionState.PAUSED);
+                s.setCurrentLevelUid(null);
                 zkSessionRepo.save(s);
             }
         }
@@ -105,6 +109,7 @@ public class VoteService {
                 for (ZkSession s : otherSessions) {
                     if (!s.getId().equals(id) && s.getState() != SessionState.FINISHED) {
                         s.setState(SessionState.PAUSED);
+                        s.setCurrentLevelUid(null); // Clear current level from other sessions
                         zkSessionRepo.save(s);
                     }
                 }
@@ -378,9 +383,15 @@ public class VoteService {
 
         // Current votes for active level
         ZkSession activeSession = findActiveSession(token);
-        if (activeSession != null && activeSession.getCurrentLevelUid() != null) {
-            data.put("currentVotes", getVotesMap(activeSession.getId(), activeSession.getCurrentLevelUid()));
+        if (activeSession != null) {
+            data.put("activeSessionName", activeSession.getDisplayName());
+            if (activeSession.getCurrentLevelUid() != null) {
+                data.put("currentVotes", getVotesMap(activeSession.getId(), activeSession.getCurrentLevelUid()));
+            } else {
+                data.put("currentVotes", null);
+            }
         } else {
+            data.put("activeSessionName", null);
             data.put("currentVotes", null);
         }
 
@@ -394,6 +405,11 @@ public class VoteService {
 
             var levelsList = new ArrayList<>(s.getPlayedLevels());
             Collections.reverse(levelsList);
+
+            // If session is ACTIVE, only show the current level
+            if (s.getState() == SessionState.ACTIVE && s.getCurrentLevelUid() != null) {
+                levelsList = new ArrayList<>(List.of(s.getCurrentLevelUid()));
+            }
 
             var levels = levelsList.stream().map(uid -> {
                 ZkLevel levelInfo = zkLevelRepo.findById(uid).orElse(null);
