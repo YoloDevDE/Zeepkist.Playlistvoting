@@ -1,6 +1,6 @@
 package app.yolobolo.zeepkist.apps.playlistvoting.repository;
 
-import app.yolobolo.zeepkist.apps.playlistvoting.model.SessionState;
+import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.SessionState;
 import app.yolobolo.zeepkist.apps.playlistvoting.model.ZkSession;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;

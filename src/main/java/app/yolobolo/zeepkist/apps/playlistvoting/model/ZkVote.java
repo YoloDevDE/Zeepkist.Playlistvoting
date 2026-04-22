@@ -1,5 +1,7 @@
 package app.yolobolo.zeepkist.apps.playlistvoting.model;
 
+import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.Platform;
+import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.VoteOption;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;

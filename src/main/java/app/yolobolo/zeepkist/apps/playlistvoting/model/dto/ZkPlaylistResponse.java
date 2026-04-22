@@ -1,5 +1,6 @@
-package app.yolobolo.zeepkist.apps.playlistvoting.model;
+package app.yolobolo.zeepkist.apps.playlistvoting.model.dto;
 
+import app.yolobolo.zeepkist.apps.playlistvoting.model.ZkVote;
 import lombok.Data;
 
 import java.util.List;

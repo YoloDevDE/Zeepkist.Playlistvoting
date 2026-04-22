@@ -21,7 +21,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain playlistVotingSecurityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain playlistVotingSecurityFilterChain(HttpSecurity http) {
         http
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/", "/playlistvoting",  "/navigation", "/error", "/login", "/register", "/css/**", "/js/**").permitAll()

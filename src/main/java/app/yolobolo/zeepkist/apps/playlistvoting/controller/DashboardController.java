@@ -1,6 +1,10 @@
 package app.yolobolo.zeepkist.apps.playlistvoting.controller;
 
 import app.yolobolo.zeepkist.apps.playlistvoting.model.*;
+import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.CreateSessionRequest;
+import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.RenameSessionRequest;
+import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.SessionStateRequest;
+import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.SessionState;
 import app.yolobolo.zeepkist.apps.playlistvoting.service.VoteService;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;

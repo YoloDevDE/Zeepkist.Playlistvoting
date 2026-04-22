@@ -1,6 +1,10 @@
 package app.yolobolo.zeepkist.apps.playlistvoting.controller;
 
 import app.yolobolo.zeepkist.apps.playlistvoting.model.*;
+import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.*;
+import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.Platform;
+import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.ResultOption;
+import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.VoteOption;
 import app.yolobolo.zeepkist.apps.playlistvoting.service.VoteService;
 import app.yolobolo.zeepkist.common.model.User;
 import jakarta.servlet.http.HttpSession;

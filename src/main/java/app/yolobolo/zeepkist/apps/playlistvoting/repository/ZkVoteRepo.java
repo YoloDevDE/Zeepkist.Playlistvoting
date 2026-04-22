@@ -1,6 +1,6 @@
 package app.yolobolo.zeepkist.apps.playlistvoting.repository;
 
-import app.yolobolo.zeepkist.apps.playlistvoting.model.Platform;
+import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.Platform;
 import app.yolobolo.zeepkist.apps.playlistvoting.model.ZkVote;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;

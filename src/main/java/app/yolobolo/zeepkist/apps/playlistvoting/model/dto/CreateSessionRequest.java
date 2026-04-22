@@ -1,4 +1,4 @@
-package app.yolobolo.zeepkist.apps.playlistvoting.model;
+package app.yolobolo.zeepkist.apps.playlistvoting.model.dto;
 
 import lombok.Data;
 

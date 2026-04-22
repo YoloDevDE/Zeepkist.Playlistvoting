@@ -1,6 +1,11 @@
 package app.yolobolo.zeepkist.apps.playlistvoting.service;
 
 import app.yolobolo.zeepkist.apps.playlistvoting.model.*;
+import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.ZkPlaylistResponse;
+import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.Platform;
+import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.ResultOption;
+import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.SessionState;
+import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.VoteOption;
 import app.yolobolo.zeepkist.apps.playlistvoting.repository.ZkLevelRepo;
 import app.yolobolo.zeepkist.apps.playlistvoting.repository.ZkSessionRepo;
 import app.yolobolo.zeepkist.apps.playlistvoting.repository.ZkVoteRepo;
@@ -192,7 +197,7 @@ public class VoteService {
 
     // --- Voting ---
 
-    public String vote(String token, String platformUserId,String platformUsername, Platform platform, VoteOption option) {
+    public String vote(String token, String platformUserId, String platformUsername, Platform platform, VoteOption option) {
         return switch (option) {
             case YES -> castVote(token, platformUserId,platformUsername, platform, true);
             case NO -> castVote(token, platformUserId,platformUsername, platform, false);
