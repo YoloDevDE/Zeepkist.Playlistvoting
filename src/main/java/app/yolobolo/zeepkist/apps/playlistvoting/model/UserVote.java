@@ -9,8 +9,9 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.Instant;
 
 @Data
-@Document("zk_votes")
-public class ZkVote {
+@Document
+public class UserVote
+{
     @Id
     private String id;
     private String sessionId;
@@ -22,7 +23,8 @@ public class ZkVote {
     private Instant createdAt;
     private Instant modifiedAt;
 
-    public ZkVote() {
+    public UserVote()
+    {
         this.createdAt = Instant.now();
         this.modifiedAt = Instant.now();
     }

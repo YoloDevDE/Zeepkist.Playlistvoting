@@ -9,7 +9,8 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 
 @Slf4j
 @Configuration
-public class MongoConfig {
+public class MongoConfig
+{
 
     @Autowired
     private MongoTemplate mongoTemplate;
@@ -18,8 +19,10 @@ public class MongoConfig {
     private boolean dropOnStartup;
 
     @PostConstruct
-    public void init() {
-        if (dropOnStartup) {
+    public void init()
+    {
+        if (dropOnStartup)
+        {
             log.info("Dropping database as requested by spring.mongodb.drop-on-startup=true");
             mongoTemplate.getDb().drop();
         }

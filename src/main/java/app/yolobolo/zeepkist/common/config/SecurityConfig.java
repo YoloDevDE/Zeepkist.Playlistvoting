@@ -4,39 +4,31 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
 @lombok.RequiredArgsConstructor
-public class SecurityConfig {
+public class SecurityConfig
+{
 
-    private final LoginSuccessHandler loginSuccessHandler;
-
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
+    private final TokenAuthenticationFilter tokenAuthenticationFilter;
 
     @Bean
-    public SecurityFilterChain playlistVotingSecurityFilterChain(HttpSecurity http) {
+    public SecurityFilterChain playlistVotingSecurityFilterChain(HttpSecurity http)
+    {
         http
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/", "/playlistvoting",  "/navigation", "/error", "/login", "/register", "/css/**", "/js/**").permitAll()
+                        .requestMatchers("/", "/playlistvoting", "/playlistvoting/dashboard", "/navigation", "/error", "/login", "/css/**", "/js/**", "/api/auth/steam/**").permitAll()
                         .requestMatchers("/auth/**").permitAll()
+                        .requestMatchers("/api/playlistvoting/dashboard/live").permitAll()
                         .requestMatchers("/api/playlistvoting/vote"
                                 , "/api/playlistvoting/result"
                                 , "/api/playlistvoting/currentLevel/**"
                                 , "/api/playlistvoting/playlist"
-                                , "/api/playlistvoting/reset").permitAll() // API Endpunkte fÃ¼r das Spiel/Public
+                                , "/api/playlistvoting/reset").authenticated() // API Endpunkte für das Spiel/Public - nun via Token/Session auth
                         .anyRequest().authenticated()
-                )
-                .formLogin(form -> form
-                        .loginPage("/login")
-                        .successHandler(loginSuccessHandler)
-                        .permitAll()
                 )
                 .logout(logout -> logout
                         .logoutUrl("/auth/logout")
@@ -44,11 +36,12 @@ public class SecurityConfig {
                         .permitAll()
                 )
                 .csrf(csrf -> csrf
-                        .ignoringRequestMatchers("/api/playlistvoting/**", "/playlistvoting/dashboard/session/**")
+                        .ignoringRequestMatchers("/api/playlistvoting/**", "/playlistvoting/dashboard/session/**", "/api/auth/steam/**")
                 )
                 .headers(headers -> headers
                         .frameOptions(org.springframework.security.config.annotation.web.configurers.HeadersConfigurer.FrameOptionsConfig::disable)
-                );
+                )
+                .addFilterBefore(tokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 

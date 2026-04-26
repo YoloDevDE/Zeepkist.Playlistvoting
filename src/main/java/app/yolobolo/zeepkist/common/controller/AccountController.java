@@ -21,12 +21,14 @@ import java.util.Objects;
 @Controller
 @RequiredArgsConstructor
 @RequestMapping("/profile")
-public class AccountController {
+public class AccountController
+{
 
     private final VoteService voteService;
 
     @GetMapping
-    public String profile(HttpSession session, Model model, @AuthenticationPrincipal UserDetails userDetails) {
+    public String profile(HttpSession session, Model model, @AuthenticationPrincipal UserDetails userDetails)
+    {
         String hostId = (String) session.getAttribute("hostId");
         User user = voteService.findUserById(hostId);
 
@@ -50,10 +52,12 @@ public class AccountController {
     }
 
     @PostMapping("/manager/add")
-    public String addManager(@RequestParam String steamId, HttpSession session) {
+    public String addManager(@RequestParam String steamId, HttpSession session)
+    {
         String hostId = (String) session.getAttribute("hostId");
         User user = voteService.findUserById(hostId);
-        if (user != null && !user.getManagerIds().contains(steamId)) {
+        if (user != null && !user.getManagerIds().contains(steamId))
+        {
             user.getManagerIds().add(steamId);
             voteService.saveUser(user);
             log.info("Added manager steamId {} to host user {}", steamId, hostId);
@@ -62,10 +66,12 @@ public class AccountController {
     }
 
     @PostMapping("/manager/remove")
-    public String removeManager(@RequestParam String steamId, HttpSession session) {
+    public String removeManager(@RequestParam String steamId, HttpSession session)
+    {
         String hostId = (String) session.getAttribute("hostId");
         User user = voteService.findUserById(hostId);
-        if (user != null) {
+        if (user != null)
+        {
             user.getManagerIds().remove(steamId);
             voteService.saveUser(user);
             log.info("Removed manager steamId {} from host user {}", steamId, hostId);
@@ -74,10 +80,12 @@ public class AccountController {
     }
 
     @PostMapping("/token/refresh")
-    public String refreshToken(HttpSession session) {
+    public String refreshToken(HttpSession session)
+    {
         String hostId = (String) session.getAttribute("hostId");
         User user = voteService.findUserById(hostId);
-        if (user != null) {
+        if (user != null)
+        {
             user.setToken(java.util.UUID.randomUUID().toString().toUpperCase());
             voteService.saveUser(user);
             session.setAttribute("token", user.getToken());

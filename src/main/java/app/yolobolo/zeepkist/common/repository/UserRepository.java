@@ -8,9 +8,8 @@ import org.springframework.stereotype.Repository;
 import java.util.Optional;
 
 @Repository
-public interface UserRepo extends MongoRepository<User, String> {
-    Optional<User> findByEmail(String email);
-
+public interface UserRepository extends MongoRepository<User, String>
+{
     Optional<User> findByToken(String token);
 
     @Query("{'identities.provider': ?0, 'identities.providerId': ?1}")

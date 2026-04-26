@@ -11,7 +11,8 @@ import java.time.Instant;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserIdentity {
+public class UserIdentity
+{
     private String provider; // STEAM, TWITCH, GOOGLE, etc.
     private String providerId; // Die ID des Providers (z.B. SteamID64)
     private String username; // Anzeigename des Providers

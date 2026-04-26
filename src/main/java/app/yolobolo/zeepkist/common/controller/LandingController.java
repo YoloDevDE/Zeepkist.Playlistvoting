@@ -9,17 +9,21 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 
 @Controller
-public class LandingController {
+public class LandingController
+{
 
     @GetMapping({"/", "/playlistvoting", "/playlistvoting/"})
-    public String index(Model model, HttpSession session) {
+    public String index(Model model, HttpSession session)
+    {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         boolean loggedIn = auth != null && auth.isAuthenticated() && !(auth instanceof AnonymousAuthenticationToken);
 
         model.addAttribute("loggedIn", loggedIn);
-        if (loggedIn) {
+        if (loggedIn)
+        {
             String displayName = (String) session.getAttribute("displayName");
-            if (displayName == null) {
+            if (displayName == null)
+            {
                 displayName = auth.getName();
             }
             model.addAttribute("username", auth.getName());

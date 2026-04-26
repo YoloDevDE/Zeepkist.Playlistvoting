@@ -27,7 +27,8 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Controller
-public class SteamAuthController {
+public class SteamAuthController
+{
     private static final String STEAM_ID_REGEX = "^https?://steamcommunity\\.com/openid/id/(\\d+)$";
     private static final Pattern STEAM_ID_PATTERN = Pattern.compile(STEAM_ID_REGEX);
 
@@ -40,7 +41,8 @@ public class SteamAuthController {
     private AuthService authService;
 
     @GetMapping("/auth/steam")
-    public RedirectView steamLogin(HttpServletRequest request) {
+    public RedirectView steamLogin(HttpServletRequest request)
+    {
         String baseUrl = constructBaseUrl(request);
         String returnTo = baseUrl + CALLBACK_PATH;
 
@@ -54,10 +56,12 @@ public class SteamAuthController {
     public String steamCallback(@RequestParam Map<String, String> params,
                                 HttpServletRequest request,
                                 HttpServletResponse response,
-                                HttpSession session) {
+                                HttpSession session)
+    {
         String claimedId = authService.verifySteamLogin(params);
 
-        if (claimedId == null) {
+        if (claimedId == null)
+        {
             return ERROR_INVALID;
         }
 
@@ -71,9 +75,10 @@ public class SteamAuthController {
         return DASHBOARD_REDIRECT;
     }
 
-    private void authenticateUser(User user, HttpServletRequest request, HttpServletResponse response) {
+    private void authenticateUser(User user, HttpServletRequest request, HttpServletResponse response)
+    {
         Authentication authentication = new UsernamePasswordAuthenticationToken(
-                user.getEmail() != null ? user.getEmail() : "steam:" + user.getSteamId(),
+                "steam:" + user.getSteamId(),
                 null,
                 user.getRoles().stream()
                         .map(SimpleGrantedAuthority::new)
@@ -86,7 +91,8 @@ public class SteamAuthController {
         securityContextRepository.saveContext(context, request, response);
     }
 
-    private void updateSession(HttpSession session, User user, String steamId) {
+    private void updateSession(HttpSession session, User user, String steamId)
+    {
         session.setAttribute("userId", user.getId());
         session.setAttribute("steamId", steamId);
         session.setAttribute("displayName", user.getDisplayName());
@@ -97,18 +103,22 @@ public class SteamAuthController {
         session.setAttribute("token", user.getToken());
     }
 
-    private String extractSteamId(String claimedId) {
-        if (claimedId == null) {
+    private String extractSteamId(String claimedId)
+    {
+        if (claimedId == null)
+        {
             throw new IllegalStateException("No claimed_id received from Steam");
         }
         Matcher matcher = STEAM_ID_PATTERN.matcher(claimedId);
-        if (!matcher.matches()) {
+        if (!matcher.matches())
+        {
             throw new IllegalStateException("Invalid Steam claimed_id: " + claimedId);
         }
         return matcher.group(1);
     }
 
-    private String constructBaseUrl(HttpServletRequest request) {
+    private String constructBaseUrl(HttpServletRequest request)
+    {
         String scheme = request.getScheme();
         String host = request.getServerName();
         int port = request.getServerPort();

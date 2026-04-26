@@ -10,8 +10,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Data
-@Document("zk_sessions")
-public class ZkSession {
+@Document
+public class VotingSession
+{
     @Id
     private String id;
     private String hostId;
@@ -22,7 +23,8 @@ public class ZkSession {
     private Instant createdAt;
     private Instant lastUsed;
 
-    public ZkSession() {
+    public VotingSession()
+    {
         this.playedLevels = new ArrayList<>();
         this.state = SessionState.ACTIVE;
         this.createdAt = Instant.now();

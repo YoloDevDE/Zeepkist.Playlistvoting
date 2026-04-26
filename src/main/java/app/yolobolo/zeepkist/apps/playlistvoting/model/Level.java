@@ -7,8 +7,9 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 @Data
 @Builder
-@Document("zk_levels")
-public class ZkLevel {
+@Document
+public class Level
+{
     @Id
     private String uid;
     private String name;

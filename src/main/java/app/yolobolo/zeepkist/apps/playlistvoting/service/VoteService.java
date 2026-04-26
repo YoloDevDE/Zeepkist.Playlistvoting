@@ -1,366 +1,294 @@
 package app.yolobolo.zeepkist.apps.playlistvoting.service;
 
-import app.yolobolo.zeepkist.apps.playlistvoting.model.*;
-import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.ZkPlaylistResponse;
+import app.yolobolo.zeepkist.apps.playlistvoting.model.Level;
+import app.yolobolo.zeepkist.apps.playlistvoting.model.UserVote;
+import app.yolobolo.zeepkist.apps.playlistvoting.model.VotingSession;
+import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.response.LevelResponse;
+import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.response.PlaylistResponse;
+import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.response.VotesResponse;
+import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.response.VotingResultResponse;
 import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.Platform;
-import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.ResultOption;
 import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.SessionState;
 import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.VoteOption;
-import app.yolobolo.zeepkist.apps.playlistvoting.repository.ZkLevelRepo;
-import app.yolobolo.zeepkist.apps.playlistvoting.repository.ZkSessionRepo;
-import app.yolobolo.zeepkist.apps.playlistvoting.repository.ZkVoteRepo;
 import app.yolobolo.zeepkist.common.model.User;
-import app.yolobolo.zeepkist.common.repository.UserRepo;
+import app.yolobolo.zeepkist.common.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-public class VoteService {
-
-
-    @Autowired
-    private UserRepo userRepo;
-    @Autowired
-    private ZkSessionRepo zkSessionRepo;
-    @Autowired
-    private ZkLevelRepo zkLevelRepo;
-    @Autowired
-    private ZkVoteRepo zkVoteRepo;
+@RequiredArgsConstructor
+public class VoteService
+{
+    private final UserRepository userRepo;
+    private final SessionService sessionService;
+    private final LevelService levelService;
+    private final VoteProcessingService voteProcessingService;
 
     // --- Token / User ---
 
-    public User findUserByToken(String token) {
+    public User findUserByToken(String token)
+    {
         return userRepo.findByToken(token).orElse(null);
     }
 
-    public User findUserById(String id) {
+    public User findUserById(String id)
+    {
         return userRepo.findById(id).orElse(null);
     }
 
-    public User findUserBySteamId(String steamId) {
+    public User findUserBySteamId(String steamId)
+    {
         return userRepo.findByIdentity("STEAM", steamId).orElse(null);
     }
 
-    public void saveUser(User user) {
+    public void saveUser(User user)
+    {
         userRepo.save(user);
         log.info("User saved: {}", user.getId());
     }
 
     // --- Session ---
 
-    public ZkSession findActiveSession(String token) {
+    public VotingSession findActiveSession(String token)
+    {
         User user = findUserByToken(token);
-        if (user == null) {
+        if (user == null)
+        {
             log.warn("No user found for token: {}", token);
             return null;
         }
-        List<ZkSession> sessions = zkSessionRepo.findByHostId(user.getId());
-        return sessions.stream()
-                .filter(s -> s.getState() == SessionState.ACTIVE)
-                .findFirst()
-                .orElseGet(() -> sessions.stream()
-                        .filter(s -> s.getState() == SessionState.PAUSED)
-                        .findFirst()
-                        .orElse(null));
+        return sessionService.findActiveOrPausedSession(user.getId());
     }
 
-    public ZkSession createSession(String token, String displayName) {
+    public VotingSession createSession(String token, String displayName)
+    {
         User user = findUserByToken(token);
-        if (user == null) {
+        if (user == null)
+        {
             log.warn("Cannot create session - no user found for token: {}", token);
             return null;
         }
-
-        // Deactivate all other sessions for this user
-        List<ZkSession> otherSessions = zkSessionRepo.findByHostId(user.getId());
-        for (ZkSession s : otherSessions) {
-            if (s.getState() != SessionState.FINISHED) {
-                s.setState(SessionState.PAUSED);
-                s.setCurrentLevelUid(null);
-                zkSessionRepo.save(s);
-            }
-        }
-
-        ZkSession session = new ZkSession();
-        session.setHostId(user.getId());
-        session.setDisplayName(displayName);
-        session.setState(SessionState.ACTIVE);
-        zkSessionRepo.save(session);
-        log.info("Created new session '{}' and deactivated others for user: {}", displayName, user.getId());
-        return session;
+        return sessionService.createSession(user, displayName);
     }
 
-    public void renameSession(String id, String newName, String hostId) {
-        ZkSession session = zkSessionRepo.findById(id).orElse(null);
-        if (session != null && session.getHostId().equals(hostId)) {
-            session.setDisplayName(newName);
-            zkSessionRepo.save(session);
-            log.info("Session {} renamed to '{}'", id, newName);
-        }
+    public void renameSession(String id, String newName, String hostId)
+    {
+        sessionService.renameSession(id, newName, hostId);
     }
 
-    public void updateSessionState(String id, SessionState state, String hostId) {
-        ZkSession session = zkSessionRepo.findById(id).orElse(null);
-        if (session != null && session.getHostId().equals(hostId)) {
-            if (state == SessionState.ACTIVE) {
-                // Pause all other active/paused sessions
-                List<ZkSession> otherSessions = zkSessionRepo.findByHostId(hostId);
-                for (ZkSession s : otherSessions) {
-                    if (!s.getId().equals(id) && s.getState() != SessionState.FINISHED) {
-                        s.setState(SessionState.PAUSED);
-                        s.setCurrentLevelUid(null); // Clear current level from other sessions
-                        zkSessionRepo.save(s);
-                    }
-                }
-            }
-            session.setState(state);
-            zkSessionRepo.save(session);
-            log.info("Session {} state changed to {}", id, state);
-        }
+    public void updateSessionState(String id, SessionState state, String hostId)
+    {
+        sessionService.updateSessionState(id, state, hostId);
     }
 
-    public void deleteSession(String id, String hostId) {
-        ZkSession session = zkSessionRepo.findById(id).orElse(null);
-        if (session != null && session.getHostId().equals(hostId)) {
-            zkSessionRepo.delete(session);
-            log.info("Session {} deleted by host {}", id, hostId);
-        }
+    public void deleteSession(String id, String hostId)
+    {
+        sessionService.deleteSession(id, hostId);
     }
 
-    public ZkSession renameActiveSession(String token, String newName) {
-        ZkSession session = findActiveSession(token);
-        if (session == null) return null;
+    public VotingSession renameActiveSession(String token, String newName)
+    {
+        VotingSession session = findActiveSession(token);
+        if (session == null)
+        {
+            return null;
+        }
         session.setDisplayName(newName);
-        zkSessionRepo.save(session);
+        sessionService.save(session);
         log.info("Active session renamed to '{}'", newName);
         return session;
     }
 
-    public ZkSession pauseSession(String token) {
-        ZkSession session = findActiveSession(token);
-        if (session == null) return null;
+    public VotingSession pauseSession(String token)
+    {
+        VotingSession session = findActiveSession(token);
+        if (session == null)
+        {
+            return null;
+        }
         session.setState(SessionState.PAUSED);
-        zkSessionRepo.save(session);
+        sessionService.save(session);
         log.info("Session '{}' paused", session.getDisplayName());
         return session;
     }
 
-    public ZkSession resumeSession(String token) {
-        ZkSession session = findActiveSession(token);
-        if (session == null || session.getState() != SessionState.PAUSED) return null;
+    public VotingSession resumeSession(String token)
+    {
+        VotingSession session = findActiveSession(token);
+        if (session == null || session.getState() != SessionState.PAUSED)
+        {
+            return null;
+        }
         session.setState(SessionState.ACTIVE);
-        zkSessionRepo.save(session);
+        sessionService.save(session);
         log.info("Session '{}' resumed", session.getDisplayName());
         return session;
     }
 
     // --- Level ---
 
-    public ZkLevel getCurrentLevel(String token) {
-        ZkSession session = findActiveSession(token);
-        if (session == null || session.getCurrentLevelUid() == null) return null;
-        return zkLevelRepo.findById(session.getCurrentLevelUid()).orElse(null);
+    public Level getCurrentLevel(String token)
+    {
+        VotingSession session = findActiveSession(token);
+        if (session == null || session.getCurrentLevelUid() == null)
+        {
+            return null;
+        }
+        return levelService.findById(session.getCurrentLevelUid()).orElse(null);
     }
 
-    public String setCurrentLevel(String token, String uid, String name, String author, Long workshopID) {
-        ZkSession session = findActiveSession(token);
-        if (session == null) return "No active session found";
-        if (session.getState() == SessionState.PAUSED) return "Session is currently paused";
+    public String setCurrentLevel(String token, String uid, String name, String author, Long workshopID)
+    {
+        VotingSession session = findActiveSession(token);
+        if (session == null)
+        {
+            return "No active session found";
+        }
+        if (session.getState() == SessionState.PAUSED)
+        {
+            return "Session is currently paused";
+        }
 
-        ZkLevel level = zkLevelRepo.findById(uid).orElseGet(() -> {
-            ZkLevel newLevel = ZkLevel.builder()
-                    .uid(uid)
-                    .name(name)
-                    .author(author)
-                    .workshopID(workshopID)
-                    .build();
-            zkLevelRepo.save(newLevel);
-            log.info("Created new level: {} by {}", name, author);
-            return newLevel;
-        });
+        Level level = levelService.getOrCreateLevel(uid, name, author, workshopID);
 
-        if (!session.getPlayedLevels().contains(uid)) {
+        if (!session.getPlayedLevels().contains(uid))
+        {
             session.getPlayedLevels().add(uid);
         }
         session.setCurrentLevelUid(uid);
-        session.setLastUsed(Instant.now());
-        zkSessionRepo.save(session);
+        sessionService.save(session);
         log.info("Current level set to '{}' in session '{}'", name, session.getDisplayName());
         return "Level set to: " + level.getName() + " by " + level.getAuthor();
     }
 
     // --- Voting ---
 
-    public String vote(String token, String platformUserId, String platformUsername, Platform platform, VoteOption option) {
-        return switch (option) {
-            case YES -> castVote(token, platformUserId,platformUsername, platform, true);
-            case NO -> castVote(token, platformUserId,platformUsername, platform, false);
-            case IDK -> castVote(token, platformUserId,platformUsername, platform, new Random().nextBoolean());
-            case REMOVE -> removeVote(token, platformUserId, platform);
-            case ABSTAIN -> abstainVote(token, platformUserId, platform);
-        };
-    }
-
-    private String castVote(String token, String platformUserId,String platformUsername, Platform platform, boolean vote) {
-        ZkSession session = findActiveSession(token);
-        if (session == null) return "No active session found";
-        if (session.getState() == SessionState.PAUSED) return "Session is currently paused";
-        if (session.getCurrentLevelUid() == null) return "No level currently set";
-
-        Optional<ZkVote> existing = zkVoteRepo.findBySessionIdAndLevelUidAndPlatformAndPlatformUserId(
-                session.getId(), session.getCurrentLevelUid(), platform, platformUserId);
-
-        ZkVote zkVote = existing.orElseGet(ZkVote::new);
-        String voteLabel = vote ? "YES" : "NO";
-
-        String action;
-        if (existing.isEmpty()) {
-            action = "voted";
-        } else if (existing.get().getVote() == (vote ? VoteOption.YES : VoteOption.NO)) {
-            action = "already voted";
-        } else {
-            action = "changed their mind and voted";
+    public String vote(String token, String platformUserId, String platformUsername, Platform platform, VoteOption option)
+    {
+        VotingSession session = findActiveSession(token);
+        if (session == null)
+        {
+            return "No active session found";
+        }
+        if (session.getState() == SessionState.PAUSED)
+        {
+            return "Session is currently paused";
+        }
+        if (session.getCurrentLevelUid() == null)
+        {
+            return "No level currently set";
         }
 
-        zkVote.setSessionId(session.getId());
-        zkVote.setLevelUid(session.getCurrentLevelUid());
-        zkVote.setPlatform(platform);
-        zkVote.setPlatformUserId(platformUserId);
-        zkVote.setPlatformUsername(platformUsername);
-        zkVote.setVote(vote ? VoteOption.YES : VoteOption.NO);
-        zkVote.setModifiedAt(Instant.now());
-        zkVoteRepo.save(zkVote);
-
-        session.setLastUsed(Instant.now());
-        zkSessionRepo.save(session);
-
-        String result = getVoteSummary(session);
-        log.info("{} ({}) {} '{}' | {}", platformUserId, platform, action, voteLabel, result);
-        return "@%s - %s '%s' | %s".formatted(platformUserId, action, voteLabel, result);
-    }
-
-    private String removeVote(String token, String platformUserId, Platform platform) {
-        ZkSession session = findActiveSession(token);
-        if (session == null) return "No active session found";
-        if (session.getState() == SessionState.PAUSED) return "Session is currently paused";
-        if (session.getCurrentLevelUid() == null) return "No level currently set";
-
-        Optional<ZkVote> existing = zkVoteRepo.findBySessionIdAndLevelUidAndPlatformAndPlatformUserId(
-                session.getId(), session.getCurrentLevelUid(), platform, platformUserId);
-
-        if (existing.isEmpty()) {
-            return "@%s - You haven't voted yet.".formatted(platformUserId);
+        String result;
+        if (option == VoteOption.REMOVE)
+        {
+            result = voteProcessingService.removeVote(session.getId(), session.getCurrentLevelUid(), platformUserId, platform);
         }
-        zkVoteRepo.delete(existing.get());
-        session.setLastUsed(Instant.now());
-        zkSessionRepo.save(session);
+        else
+        {
+            VoteOption actualOption = (option == VoteOption.IDK) ? (new Random().nextBoolean() ? VoteOption.YES : VoteOption.NO) : option;
+            result = voteProcessingService.castVote(session.getId(), session.getCurrentLevelUid(), platformUserId, platformUsername, platform, actualOption);
+        }
 
-        String result = getVoteSummary(session);
-        log.info("{} ({}) revoked their vote | {}", platformUserId, platform, result);
-        return "@%s - revoked their vote | %s".formatted(platformUserId, result);
-    }
-
-    private String abstainVote(String token, String platformUserId, Platform platform) {
-        ZkSession session = findActiveSession(token);
-        if (session == null) return "No active session found";
-        if (session.getState() == SessionState.PAUSED) return "Session is currently paused";
-        if (session.getCurrentLevelUid() == null) return "No level currently set";
-
-        Optional<ZkVote> existing = zkVoteRepo.findBySessionIdAndLevelUidAndPlatformAndPlatformUserId(
-                session.getId(), session.getCurrentLevelUid(), platform, platformUserId);
-
-        ZkVote zkVote = existing.orElseGet(ZkVote::new);
-        zkVote.setSessionId(session.getId());
-        zkVote.setLevelUid(session.getCurrentLevelUid());
-        zkVote.setPlatform(platform);
-        zkVote.setPlatformUserId(platformUserId);
-        zkVote.setVote(VoteOption.ABSTAIN);
-        zkVote.setModifiedAt(Instant.now());
-        zkVoteRepo.save(zkVote);
-
-        session.setLastUsed(Instant.now());
-        zkSessionRepo.save(session);
-
-        String result = getVoteSummary(session);
-        log.info("{} ({}) abstained | {}", platformUserId, platform, result);
-        return "@%s - abstained from voting | %s".formatted(platformUserId, result);
+        sessionService.save(session);
+        String summary = getVoteSummary(session);
+        return result + " | " + summary;
     }
 
     // --- Result ---
 
-    public String getResult(String token, ResultOption option) {
-        ZkSession session = findActiveSession(token);
-        if (session == null) return "No active session found";
-        if (session.getCurrentLevelUid() == null) return "No level currently set";
+    public VotingResultResponse getResult(String token)
+    {
+        VotingSession session = findActiveSession(token);
+        if (session == null || session.getCurrentLevelUid() == null)
+        {
+            return null;
+        }
 
-        List<ZkVote> votes = zkVoteRepo.findBySessionIdAndLevelUid(session.getId(), session.getCurrentLevelUid());
-        log.debug("Result requested - option: {}", option);
-        return switch (option) {
-            case YES -> String.valueOf(votes.stream().filter(v -> v.getVote() == VoteOption.YES).count());
-            case NO -> String.valueOf(votes.stream().filter(v -> v.getVote() == VoteOption.NO).count());
-            case ABSTAIN -> String.valueOf(votes.stream().filter(v -> v.getVote() == VoteOption.ABSTAIN).count());
-            case TOTAL -> getVoteSummary(session);
-        };
+        Level level = levelService.findById(session.getCurrentLevelUid()).orElse(null);
+        List<UserVote> votes = voteProcessingService.getVotes(session.getId(), session.getCurrentLevelUid());
+
+        VotesResponse votesResponse = voteProcessingService.calculateVotesResponse(votes);
+
+        return VotingResultResponse.builder()
+                .level(LevelResponse.builder()
+                        .levelUid(session.getCurrentLevelUid())
+                        .levelName(level != null ? level.getName() : "Unknown")
+                        .levelAuthor(level != null ? level.getAuthor() : "Unknown")
+                        .workshopId(level != null ? level.getWorkshopID() : null)
+                        .build())
+                .votes(votesResponse)
+                .build();
     }
 
-    private String getVoteSummary(ZkSession session) {
-        List<ZkVote> votes = zkVoteRepo.findBySessionIdAndLevelUid(session.getId(), session.getCurrentLevelUid());
-        long yes = votes.stream().filter(v -> v.getVote() == VoteOption.YES).count();
-        long no = votes.stream().filter(v -> v.getVote() == VoteOption.NO).count();
-        long abstain = votes.stream().filter(v -> v.getVote() == VoteOption.ABSTAIN).count();
-        return "%d/%d/%d (y/n/a)".formatted(yes, no, abstain);
+    private String getVoteSummary(VotingSession session)
+    {
+        List<UserVote> votes = voteProcessingService.getVotes(session.getId(), session.getCurrentLevelUid());
+        VotesResponse votesResponse = voteProcessingService.calculateVotesResponse(votes);
+        return "%d/%d/%d (y/n/a)".formatted(votesResponse.getYes(), votesResponse.getNo(), votesResponse.getAbstain());
     }
 
     // --- Reset ---
 
-    public String reset(String token) {
-        ZkSession session = findActiveSession(token);
-        if (session == null) return "No active session found";
-        if (session.getState() == SessionState.PAUSED) return "Session is currently paused";
+    public String reset(String token)
+    {
+        VotingSession session = findActiveSession(token);
+        if (session == null)
+        {
+            return "No active session found";
+        }
+        if (session.getState() == SessionState.PAUSED)
+        {
+            return "Session is currently paused";
+        }
 
-        ZkLevel level = getCurrentLevel(token);
+        Level level = getCurrentLevel(token);
         String levelInfo = level != null ? level.getName() + " by " + level.getAuthor() : "Previous Level";
 
-        List<ZkVote> votes = level != null
-                ? zkVoteRepo.findBySessionIdAndLevelUid(session.getId(), level.getUid())
+        List<UserVote> votes = level != null
+                ? voteProcessingService.getVotes(session.getId(), level.getUid())
                 : List.of();
 
-        long yes = votes.stream().filter(v -> v.getVote() == VoteOption.YES).count();
-        long no = votes.stream().filter(v -> v.getVote() == VoteOption.NO).count();
-        long abstain = votes.stream().filter(v -> v.getVote() == VoteOption.ABSTAIN).count();
+        VotesResponse votesResponse = voteProcessingService.calculateVotesResponse(votes);
 
         session.setCurrentLevelUid(null);
-        session.setLastUsed(Instant.now());
-        zkSessionRepo.save(session);
+        sessionService.save(session);
 
-        String message = "RESULT<br>%s<br>----------------<br>%d/%d/%d (y/n/a)".formatted(levelInfo, yes, no, abstain);
-        log.info("Reset - {} | {}/{}/{} (y/n/a)", levelInfo, yes, no, abstain);
+        String message = "RESULT<br>%s<br>----------------<br>%d/%d/%d (y/n/a)".formatted(levelInfo, votesResponse.getYes(), votesResponse.getNo(), votesResponse.getAbstain());
+        log.info("Reset - {} | {}/{}/{} (y/n/a)", levelInfo, votesResponse.getYes(), votesResponse.getNo(), votesResponse.getAbstain());
         return message;
     }
 
-    public ZkPlaylistResponse getPlaylist(String token) {
-        ZkSession session = findActiveSession(token);
-        if (session == null) return null;
+    public PlaylistResponse getPlaylist(String token)
+    {
+        VotingSession session = findActiveSession(token);
+        if (session == null)
+        {
+            return null;
+        }
 
-        ZkPlaylistResponse response = new ZkPlaylistResponse();
+        PlaylistResponse response = new PlaylistResponse();
         response.setSessionName(session.getDisplayName());
 
-        List<ZkPlaylistResponse.LevelWithVotes> levels = session.getPlayedLevels().stream()
-                .map(uid -> {
-                    ZkLevel level = zkLevelRepo.findById(uid).orElse(null);
-                    if (level == null) return null;
+        List<PlaylistResponse.LevelWithVotes> levels = session.getPlayedLevels().stream()
+                .map(uid ->
+                {
+                    Level level = levelService.findById(uid).orElse(null);
+                    if (level == null)
+                    {
+                        return null;
+                    }
 
-                    ZkPlaylistResponse.LevelWithVotes lwv = new ZkPlaylistResponse.LevelWithVotes();
+                    PlaylistResponse.LevelWithVotes lwv = new PlaylistResponse.LevelWithVotes();
                     lwv.setUid(uid);
                     lwv.setName(level.getName());
                     lwv.setAuthor(level.getAuthor());
-                    lwv.setVotes(zkVoteRepo.findBySessionIdAndLevelUid(session.getId(), uid));
+                    lwv.setVotes(voteProcessingService.getVotes(session.getId(), uid));
                     return lwv;
                 })
                 .filter(Objects::nonNull)
@@ -371,37 +299,67 @@ public class VoteService {
         return response;
     }
 
-    public Map<String, Object> getDashboardData(String token, String hostId) {
+    public Map<String, Object> getDashboardData(String token, String hostId)
+    {
         Map<String, Object> data = new LinkedHashMap<>();
 
-        // Current level
-        ZkLevel currentLevel = getCurrentLevel(token);
-        if (currentLevel != null) {
-            Map<String, Object> lvl = new LinkedHashMap<>();
-            lvl.put("name", currentLevel.getName());
-            lvl.put("author", currentLevel.getAuthor());
-            lvl.put("uid", currentLevel.getUid());
-            data.put("currentLevel", lvl);
-        } else {
-            data.put("currentLevel", null);
-        }
+        // Current level (only if token is provided)
+        if (token != null)
+        {
+            Level currentLevel = getCurrentLevel(token);
+            if (currentLevel != null)
+            {
+                Map<String, Object> lvl = new LinkedHashMap<>();
+                lvl.put("name", currentLevel.getName());
+                lvl.put("author", currentLevel.getAuthor());
+                lvl.put("uid", currentLevel.getUid());
+                data.put("currentLevel", lvl);
+            }
+            else
+            {
+                data.put("currentLevel", null);
+            }
 
-        // Current votes for active level
-        ZkSession activeSession = findActiveSession(token);
-        if (activeSession != null) {
-            data.put("activeSessionName", activeSession.getDisplayName());
-            if (activeSession.getCurrentLevelUid() != null) {
-                data.put("currentVotes", getVotesMap(activeSession.getId(), activeSession.getCurrentLevelUid()));
-            } else {
+            // Current votes for active level
+            VotingSession activeSession = findActiveSession(token);
+            if (activeSession != null)
+            {
+                data.put("activeSessionName", activeSession.getDisplayName());
+                if (activeSession.getCurrentLevelUid() != null)
+                {
+                    data.put("currentVotes", getVotesMap(activeSession.getId(), activeSession.getCurrentLevelUid()));
+                }
+                else
+                {
+                    data.put("currentVotes", null);
+                }
+            }
+            else
+            {
+                data.put("activeSessionName", null);
                 data.put("currentVotes", null);
             }
-        } else {
+        }
+        else
+        {
+            data.put("currentLevel", null);
             data.put("activeSessionName", null);
             data.put("currentVotes", null);
         }
 
-        // All sessions with level details + per-level votes
-        var sessions = zkSessionRepo.findByHostId(hostId).stream().map(s -> {
+        // All sessions (either for host, or all active for guests)
+        List<VotingSession> sessionsToMap;
+        if (hostId != null)
+        {
+            sessionsToMap = sessionService.findByHostId(hostId);
+        }
+        else
+        {
+            sessionsToMap = sessionService.findAllActive();
+        }
+
+        var sessions = sessionsToMap.stream().map(s ->
+        {
             Map<String, Object> sm = new LinkedHashMap<>();
             sm.put("id", s.getId());
             sm.put("name", s.getDisplayName());
@@ -412,13 +370,15 @@ public class VoteService {
             Collections.reverse(levelsList);
 
             // If session is ACTIVE, only show the current level
-            if (s.getState() == SessionState.ACTIVE && s.getCurrentLevelUid() != null) {
+            if (s.getState() == SessionState.ACTIVE && s.getCurrentLevelUid() != null)
+            {
                 levelsList = new ArrayList<>(List.of(s.getCurrentLevelUid()));
             }
 
-            var levels = levelsList.stream().map(uid -> {
-                ZkLevel levelInfo = zkLevelRepo.findById(uid).orElse(null);
-                var lvlVotes = zkVoteRepo.findBySessionIdAndLevelUid(s.getId(), uid);
+            var levels = levelsList.stream().map(uid ->
+            {
+                Level levelInfo = levelService.findById(uid).orElse(null);
+                var lvlVotes = voteProcessingService.getVotes(s.getId(), uid);
 
                 Map<String, Object> lm = getVotesMap(lvlVotes);
                 lm.put("uid", uid);
@@ -428,8 +388,9 @@ public class VoteService {
                 lm.put("isCurrent", uid.equals(s.getCurrentLevelUid()));
 
                 var individualVotes = lvlVotes.stream()
-                        .sorted(Comparator.comparing(ZkVote::getModifiedAt).reversed())
-                        .map(v -> {
+                        .sorted(Comparator.comparing(UserVote::getModifiedAt).reversed())
+                        .map(v ->
+                        {
                             Map<String, Object> vm = new LinkedHashMap<>();
                             vm.put("user", v.getPlatformUserId());
                             vm.put("username", v.getPlatformUsername());
@@ -450,38 +411,39 @@ public class VoteService {
         return data;
     }
 
-    private Map<String, Object> getVotesMap(String sessionId, String levelUid) {
-        return getVotesMap(zkVoteRepo.findBySessionIdAndLevelUid(sessionId, levelUid));
+    private Map<String, Object> getVotesMap(String sessionId, String levelUid)
+    {
+        return getVotesMap(voteProcessingService.getVotes(sessionId, levelUid));
     }
 
-    private Map<String, Object> getVotesMap(List<ZkVote> votes) {
-        long yes = votes.stream().filter(v -> v.getVote() == VoteOption.YES).count();
-        long no = votes.stream().filter(v -> v.getVote() == VoteOption.NO).count();
-        long abstain = votes.stream().filter(v -> v.getVote() == VoteOption.ABSTAIN).count();
-        long total = yes + no + abstain;
+    private Map<String, Object> getVotesMap(List<UserVote> votes)
+    {
+        Map<String, Object> map = voteProcessingService.calculateVotesMap(votes);
+        long yes = (Long) map.get("yes");
+        long no = (Long) map.get("no");
         double yesPct = (yes + no) > 0 ? (yes * 100.0 / (yes + no)) : 0;
-
-        Map<String, Object> map = new LinkedHashMap<>();
-        map.put("yes", yes);
-        map.put("no", no);
-        map.put("abstain", abstain);
-        map.put("total", total);
         map.put("yesPct", Math.round(yesPct));
         return map;
     }
 
-    public List<ZkSession> findAllSessions(String hostId) {
-        return zkSessionRepo.findByHostId(hostId);
+    public List<VotingSession> findAllSessions(String hostId)
+    {
+        return sessionService.findByHostId(hostId);
     }
 
-    public byte[] downloadPlaylist(String id, int roundLength, boolean shuffle, String name, String hostId) throws Exception {
-        ZkSession zkSession = zkSessionRepo.findById(id).orElse(null);
-        if (zkSession == null || !zkSession.getHostId().equals(hostId)) return null;
+    public byte[] downloadPlaylist(String id, int roundLength, boolean shuffle, String name, String hostId) throws Exception
+    {
+        VotingSession votingSession = sessionService.findById(id).orElse(null);
+        if (votingSession == null || !votingSession.getHostId().equals(hostId))
+        {
+            return null;
+        }
 
-        var levels = zkSession.getPlayedLevels().stream()
-                .map(uid -> zkLevelRepo.findById(uid).orElse(null))
+        var levels = votingSession.getPlayedLevels().stream()
+                .map(uid -> levelService.findById(uid).orElse(null))
                 .filter(Objects::nonNull)
-                .map(l -> {
+                .map(l ->
+                {
                     var lm = new LinkedHashMap<String, Object>();
                     lm.put("UID", l.getUid());
                     lm.put("WorkshopID", l.getWorkshopID() != null ? l.getWorkshopID() : 0);
@@ -493,7 +455,7 @@ public class VoteService {
                     return lm;
                 }).toList();
 
-        String playlistName = (name != null && !name.isBlank()) ? name : zkSession.getDisplayName();
+        String playlistName = (name != null && !name.isBlank()) ? name : votingSession.getDisplayName();
 
         Map<String, Object> playlist = new LinkedHashMap<>();
         playlist.put("name", playlistName);
@@ -506,14 +468,20 @@ public class VoteService {
         return mapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(playlist);
     }
 
-    public String getPlaylistFilename(String sessionId, String name) {
-        ZkSession zkSession = zkSessionRepo.findById(sessionId).orElse(null);
+    public String getPlaylistFilename(String sessionId, String name)
+    {
+        VotingSession votingSession = sessionService.findById(sessionId).orElse(null);
         String playlistName;
-        if (name != null && !name.isBlank()) {
+        if (name != null && !name.isBlank())
+        {
             playlistName = name;
-        } else if (zkSession != null) {
-            playlistName = zkSession.getDisplayName();
-        } else {
+        }
+        else if (votingSession != null)
+        {
+            playlistName = votingSession.getDisplayName();
+        }
+        else
+        {
             playlistName = "playlist";
         }
         return playlistName.replaceAll("[^a-zA-Z0-9_-]", "_") + ".zeeplist";

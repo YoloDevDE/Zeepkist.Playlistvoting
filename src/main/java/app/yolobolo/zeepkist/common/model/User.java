@@ -17,17 +17,13 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document("users")
-public class User {
+public class User
+{
     @Id
     private String id;
 
     @Indexed(unique = true, sparse = true)
-    private String email;
-
-    @Indexed(unique = true, sparse = true)
     private String token;
-
-    private String password; // BCrypt hashed
 
     private String displayName;
 
@@ -43,17 +39,23 @@ public class User {
     private Instant createdAt;
     private Instant lastLoginAt;
 
-    public boolean hasRole(String role) {
+    public boolean hasRole(String role)
+    {
         return roles != null && roles.contains(role);
     }
 
-    public boolean hasSteamLinked() {
+    public boolean hasSteamLinked()
+    {
         return identities != null && identities.stream()
                 .anyMatch(i -> "STEAM".equalsIgnoreCase(i.getProvider()));
     }
 
-    public String getSteamId() {
-        if (identities == null) return null;
+    public String getSteamId()
+    {
+        if (identities == null)
+        {
+            return null;
+        }
         return identities.stream()
                 .filter(i -> "STEAM".equalsIgnoreCase(i.getProvider()))
                 .map(UserIdentity::getProviderId)
