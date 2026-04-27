@@ -20,6 +20,16 @@ public class UserService
 
     private final UserRepository userRepo;
 
+    public Optional<User> findById(String id)
+    {
+        return userRepo.findById(id);
+    }
+
+    public List<User> findAll()
+    {
+        return userRepo.findAll();
+    }
+
     public Optional<User> findByIdentity(String provider, String providerId)
     {
         return userRepo.findByIdentity(provider, providerId);

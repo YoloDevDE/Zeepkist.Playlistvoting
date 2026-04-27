@@ -20,7 +20,7 @@ public class SecurityConfig
     {
         http
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/", "/playlistvoting", "/playlistvoting/dashboard", "/navigation", "/error", "/login", "/css/**", "/js/**", "/api/auth/steam/**").permitAll()
+                        .requestMatchers("/", "/playlistvoting/**", "/navigation", "/error", "/login", "/logout", "/css/**", "/js/**", "/api/auth/steam/**", "/ws-dashboard/**").permitAll()
                         .requestMatchers("/auth/**").permitAll()
                         .requestMatchers("/api/playlistvoting/dashboard/live").permitAll()
                         .requestMatchers("/api/playlistvoting/vote"
@@ -36,7 +36,7 @@ public class SecurityConfig
                         .permitAll()
                 )
                 .csrf(csrf -> csrf
-                        .ignoringRequestMatchers("/api/playlistvoting/**", "/playlistvoting/dashboard/session/**", "/api/auth/steam/**")
+                        .ignoringRequestMatchers("/api/playlistvoting/**", "/api/auth/steam/**", "/ws-dashboard/**", "/ws-dashboard")
                 )
                 .headers(headers -> headers
                         .frameOptions(org.springframework.security.config.annotation.web.configurers.HeadersConfigurer.FrameOptionsConfig::disable)

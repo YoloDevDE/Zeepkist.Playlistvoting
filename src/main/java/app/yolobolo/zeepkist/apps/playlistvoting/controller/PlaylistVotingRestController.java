@@ -78,6 +78,30 @@ public class PlaylistVotingRestController
         return ResponseEntity.ok().build();
     }
 
+    @PostMapping(value = "/session/{id}/reset-votes", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Void> resetVotes(@PathVariable String id, HttpSession session)
+    {
+        String hostId = (String) session.getAttribute("hostId");
+        if (hostId == null)
+        {
+            return ResponseEntity.status(401).build();
+        }
+        voteService.resetVotes(id, hostId);
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping(value = "/vote/{id}")
+    public ResponseEntity<Void> deleteVote(@PathVariable String id, HttpSession session)
+    {
+        String hostId = (String) session.getAttribute("hostId");
+        if (hostId == null)
+        {
+            return ResponseEntity.status(401).build();
+        }
+        voteService.deleteVote(id, hostId);
+        return ResponseEntity.ok().build();
+    }
+
     @PostMapping(value = "/session/{id}/delete", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Void> deleteSession(@PathVariable String id, HttpSession session)
     {
@@ -199,12 +223,16 @@ public class PlaylistVotingRestController
     @GetMapping("/vote")
     String vote(
             HttpSession session,
+            @RequestParam(required = false) String token,
             @RequestParam String platformUserId,
             @RequestParam String username,
             @RequestParam Platform platform,
             @RequestParam VoteOption vote)
     {
-        String token = (String) session.getAttribute("token");
+        if (token == null)
+        {
+            token = (String) session.getAttribute("token");
+        }
         log.info("Vote received - user: {} ({}),  platform: {}, option: {}", platformUserId, username, platform, vote);
         if (token == null)
         {
@@ -277,16 +305,33 @@ public class PlaylistVotingRestController
         return ResponseEntity.ok(playlist);
     }
 
-    /**
-     * Live dashboard data â€” polled every few seconds by the frontend.
-     */
     @GetMapping("/dashboard/live")
-    public ResponseEntity<Map<String, Object>> liveDashboard(HttpSession session)
+    public ResponseEntity<Map<String, Object>> liveDashboard(
+            @RequestParam(required = false) String hostId,
+            HttpSession session)
     {
         String token = (String) session.getAttribute("token");
-        String hostId = (String) session.getAttribute("hostId");
+        String effectiveHostId = hostId != null ? hostId : (String) session.getAttribute("hostId");
 
-        return ResponseEntity.ok(voteService.getDashboardData(token, hostId));
+        return ResponseEntity.ok(voteService.getDashboardData(token, effectiveHostId));
+    }
+
+    @PostMapping("/dashboard/vote")
+    public ResponseEntity<String> dashboardVote(
+            @RequestParam String hostId,
+            @RequestParam VoteOption vote,
+            HttpSession session)
+    {
+        String steamId = (String) session.getAttribute("steamId");
+        String steamName = (String) session.getAttribute("steamName");
+
+        if (steamId == null)
+        {
+            return ResponseEntity.status(401).body("You must be logged in to vote");
+        }
+
+        String result = voteService.voteByHostId(hostId, steamId, steamName, Platform.STEAM, vote);
+        return ResponseEntity.ok(result);
     }
     // --- Set ---
 

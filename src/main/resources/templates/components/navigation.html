@@ -26,7 +26,7 @@
                           th:text="${displayName ?: 'Profile'}">Profile</span>
                 </a>
                 <a class="text-xs bg-slate-800 hover:bg-red-500/20 hover:text-red-400 px-3 py-1.5 rounded border border-slate-700 transition-all"
-                   href="/auth/logout">Logout</a>
+                   href="/logout">Logout</a>
             </div>
             <div th:unless="${loggedIn}">
                 <a class="text-sm font-medium bg-brand-accent text-brand-dark px-4 py-2 rounded-lg hover:bg-brand-accent/80 transition-all shadow-lg shadow-brand-accent/20"

@@ -53,6 +53,7 @@ class SteamAuthRestControllerTest
                         .content(ticket)
                         .contentType(MediaType.TEXT_PLAIN))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("user123"))
                 .andExpect(jsonPath("$.token").value("TEST_TOKEN"))
                 .andExpect(jsonPath("$.displayName").value("TestUser"))
                 .andExpect(jsonPath("$.steamId").value(steamId));

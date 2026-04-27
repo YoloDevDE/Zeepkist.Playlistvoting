@@ -10,10 +10,13 @@ import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.response.VotingResult
 import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.Platform;
 import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.SessionState;
 import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.VoteOption;
+import app.yolobolo.zeepkist.apps.playlistvoting.repository.UserVoteRepository;
 import app.yolobolo.zeepkist.common.model.User;
 import app.yolobolo.zeepkist.common.repository.UserRepository;
+import app.yolobolo.zeepkist.common.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -25,11 +28,40 @@ import java.util.stream.Collectors;
 public class VoteService
 {
     private final UserRepository userRepo;
+    private final UserVoteRepository voteRepository;
     private final SessionService sessionService;
     private final LevelService levelService;
     private final VoteProcessingService voteProcessingService;
+    private final SimpMessagingTemplate messagingTemplate;
+    private final UserService userService;
 
     // --- Token / User ---
+
+    private void notifyUpdate(String hostId)
+    {
+        log.debug("Notifying update for host: {}", hostId);
+        messagingTemplate.convertAndSend("/topic/dashboard/" + hostId, "update");
+        messagingTemplate.convertAndSend("/topic/dashboard/global", "update");
+
+        // Send results directly for mod clients
+        VotingResultResponse result = getResultByHostId(hostId);
+        if (result != null)
+        {
+            // Use steamId if available, fallback to internalId
+            String topicId = hostId;
+            User user = findUserById(hostId);
+            if (user != null)
+            {
+                String steamId = user.getSteamId();
+                if (steamId != null && !steamId.isEmpty())
+                {
+                    topicId = steamId;
+                }
+            }
+            log.info("Sending result to topic: /topic/votes/{}", topicId);
+            messagingTemplate.convertAndSend("/topic/votes/" + topicId, result);
+        }
+    }
 
     public User findUserByToken(String token)
     {
@@ -73,22 +105,27 @@ public class VoteService
             log.warn("Cannot create session - no user found for token: {}", token);
             return null;
         }
-        return sessionService.createSession(user, displayName);
+        VotingSession session = sessionService.createSession(user, displayName);
+        notifyUpdate(user.getId());
+        return session;
     }
 
     public void renameSession(String id, String newName, String hostId)
     {
         sessionService.renameSession(id, newName, hostId);
+        notifyUpdate(hostId);
     }
 
     public void updateSessionState(String id, SessionState state, String hostId)
     {
         sessionService.updateSessionState(id, state, hostId);
+        notifyUpdate(hostId);
     }
 
     public void deleteSession(String id, String hostId)
     {
         sessionService.deleteSession(id, hostId);
+        notifyUpdate(hostId);
     }
 
     public VotingSession renameActiveSession(String token, String newName)
@@ -101,6 +138,7 @@ public class VoteService
         session.setDisplayName(newName);
         sessionService.save(session);
         log.info("Active session renamed to '{}'", newName);
+        notifyUpdate(session.getHostId());
         return session;
     }
 
@@ -114,6 +152,7 @@ public class VoteService
         session.setState(SessionState.PAUSED);
         sessionService.save(session);
         log.info("Session '{}' paused", session.getDisplayName());
+        notifyUpdate(session.getHostId());
         return session;
     }
 
@@ -127,6 +166,7 @@ public class VoteService
         session.setState(SessionState.ACTIVE);
         sessionService.save(session);
         log.info("Session '{}' resumed", session.getDisplayName());
+        notifyUpdate(session.getHostId());
         return session;
     }
 
@@ -163,6 +203,7 @@ public class VoteService
         session.setCurrentLevelUid(uid);
         sessionService.save(session);
         log.info("Current level set to '{}' in session '{}'", name, session.getDisplayName());
+        notifyUpdate(session.getHostId());
         return "Level set to: " + level.getName() + " by " + level.getAuthor();
     }
 
@@ -170,7 +211,16 @@ public class VoteService
 
     public String vote(String token, String platformUserId, String platformUsername, Platform platform, VoteOption option)
     {
-        VotingSession session = findActiveSession(token);
+        return processVote(findActiveSession(token), platformUserId, platformUsername, platform, option);
+    }
+
+    public String voteByHostId(String hostId, String platformUserId, String platformUsername, Platform platform, VoteOption option)
+    {
+        return processVote(sessionService.findActiveOrPausedSession(hostId), platformUserId, platformUsername, platform, option);
+    }
+
+    private String processVote(VotingSession session, String platformUserId, String platformUsername, Platform platform, VoteOption option)
+    {
         if (session == null)
         {
             return "No active session found";
@@ -197,6 +247,7 @@ public class VoteService
 
         sessionService.save(session);
         String summary = getVoteSummary(session);
+        notifyUpdate(session.getHostId());
         return result + " | " + summary;
     }
 
@@ -204,22 +255,34 @@ public class VoteService
 
     public VotingResultResponse getResult(String token)
     {
-        VotingSession session = findActiveSession(token);
-        if (session == null || session.getCurrentLevelUid() == null)
+        User user = findUserByToken(token);
+        if (user == null)
+        {
+            return null;
+        }
+        return getResultByHostId(user.getId());
+    }
+
+    public VotingResultResponse getResultByHostId(String hostId)
+    {
+        VotingSession session = sessionService.findActiveOrPausedSession(hostId);
+        if (session == null)
         {
             return null;
         }
 
-        Level level = levelService.findById(session.getCurrentLevelUid()).orElse(null);
-        List<UserVote> votes = voteProcessingService.getVotes(session.getId(), session.getCurrentLevelUid());
+        Level level = session.getCurrentLevelUid() != null ? levelService.findById(session.getCurrentLevelUid()).orElse(null) : null;
+        List<UserVote> votes = session.getCurrentLevelUid() != null ? voteProcessingService.getVotes(session.getId(), session.getCurrentLevelUid()) : List.of();
 
         VotesResponse votesResponse = voteProcessingService.calculateVotesResponse(votes);
 
         return VotingResultResponse.builder()
+                .sessionName(session.getDisplayName())
+                .sessionState(session.getState().name())
                 .level(LevelResponse.builder()
                         .levelUid(session.getCurrentLevelUid())
-                        .levelName(level != null ? level.getName() : "Unknown")
-                        .levelAuthor(level != null ? level.getAuthor() : "Unknown")
+                        .levelName(level != null ? level.getName() : "None")
+                        .levelAuthor(level != null ? level.getAuthor() : "None")
                         .workshopId(level != null ? level.getWorkshopID() : null)
                         .build())
                 .votes(votesResponse)
@@ -261,6 +324,7 @@ public class VoteService
 
         String message = "RESULT<br>%s<br>----------------<br>%d/%d/%d (y/n/a)".formatted(levelInfo, votesResponse.getYes(), votesResponse.getNo(), votesResponse.getAbstain());
         log.info("Reset - {} | {}/{}/{} (y/n/a)", levelInfo, votesResponse.getYes(), votesResponse.getNo(), votesResponse.getAbstain());
+        notifyUpdate(session.getHostId());
         return message;
     }
 
@@ -303,47 +367,47 @@ public class VoteService
     {
         Map<String, Object> data = new LinkedHashMap<>();
 
-        // Current level (only if token is provided)
+        VotingSession activeSession = null;
         if (token != null)
         {
-            Level currentLevel = getCurrentLevel(token);
-            if (currentLevel != null)
+            activeSession = findActiveSession(token);
+        }
+        else if (hostId != null)
+        {
+            activeSession = sessionService.findActiveOrPausedSession(hostId);
+        }
+
+        if (activeSession != null)
+        {
+            data.put("activeSessionName", activeSession.getDisplayName());
+            if (activeSession.getCurrentLevelUid() != null)
             {
-                Map<String, Object> lvl = new LinkedHashMap<>();
-                lvl.put("name", currentLevel.getName());
-                lvl.put("author", currentLevel.getAuthor());
-                lvl.put("uid", currentLevel.getUid());
-                data.put("currentLevel", lvl);
+                Level currentLevel = levelService.findById(activeSession.getCurrentLevelUid()).orElse(null);
+                if (currentLevel != null)
+                {
+                    Map<String, Object> lvl = new LinkedHashMap<>();
+                    lvl.put("name", currentLevel.getName());
+                    lvl.put("author", currentLevel.getAuthor());
+                    lvl.put("uid", currentLevel.getUid());
+                    lvl.put("workshopID", currentLevel.getWorkshopID());
+                    data.put("currentLevel", lvl);
+                }
+                else
+                {
+                    data.put("currentLevel", null);
+                }
+                data.put("currentVotes", getVotesMap(activeSession.getId(), activeSession.getCurrentLevelUid()));
             }
             else
             {
                 data.put("currentLevel", null);
-            }
-
-            // Current votes for active level
-            VotingSession activeSession = findActiveSession(token);
-            if (activeSession != null)
-            {
-                data.put("activeSessionName", activeSession.getDisplayName());
-                if (activeSession.getCurrentLevelUid() != null)
-                {
-                    data.put("currentVotes", getVotesMap(activeSession.getId(), activeSession.getCurrentLevelUid()));
-                }
-                else
-                {
-                    data.put("currentVotes", null);
-                }
-            }
-            else
-            {
-                data.put("activeSessionName", null);
                 data.put("currentVotes", null);
             }
         }
         else
         {
-            data.put("currentLevel", null);
             data.put("activeSessionName", null);
+            data.put("currentLevel", null);
             data.put("currentVotes", null);
         }
 
@@ -392,10 +456,12 @@ public class VoteService
                         .map(v ->
                         {
                             Map<String, Object> vm = new LinkedHashMap<>();
+                            vm.put("id", v.getId());
                             vm.put("user", v.getPlatformUserId());
                             vm.put("username", v.getPlatformUsername());
                             vm.put("platform", v.getPlatform().name());
                             vm.put("vote", v.getVote().name());
+                            vm.put("timestamp", v.getModifiedAt() != null ? v.getModifiedAt().toEpochMilli() : null);
                             return vm;
                         }).collect(Collectors.toList());
                 lm.put("votes", individualVotes);
@@ -409,6 +475,29 @@ public class VoteService
 
         data.put("sessions", sessions);
         return data;
+    }
+
+    public void resetVotes(String sessionId, String hostId)
+    {
+        VotingSession session = sessionService.findById(sessionId).orElseThrow();
+        if (!session.getHostId().equals(hostId))
+        {
+            throw new SecurityException("Not the owner");
+        }
+        voteProcessingService.resetVotes(sessionId);
+        notifyUpdate(hostId);
+    }
+
+    public void deleteVote(String voteId, String hostId)
+    {
+        UserVote vote = voteRepository.findById(voteId).orElseThrow();
+        VotingSession session = sessionService.findById(vote.getSessionId()).orElseThrow();
+        if (!session.getHostId().equals(hostId))
+        {
+            throw new SecurityException("Not the owner");
+        }
+        voteProcessingService.deleteVoteById(voteId);
+        notifyUpdate(hostId);
     }
 
     private Map<String, Object> getVotesMap(String sessionId, String levelUid)
@@ -487,4 +576,29 @@ public class VoteService
         return playlistName.replaceAll("[^a-zA-Z0-9_-]", "_") + ".zeeplist";
     }
 
+    public List<Map<String, Object>> findAllHostsWithSessions()
+    {
+        List<VotingSession> allSessions = sessionService.findAll();
+        Map<String, List<VotingSession>> sessionsByHost = allSessions.stream()
+                .collect(Collectors.groupingBy(VotingSession::getHostId));
+
+        return sessionsByHost.entrySet().stream()
+                .map(entry ->
+                {
+                    String hostId = entry.getKey();
+                    List<VotingSession> hostSessions = entry.getValue();
+                    User host = userService.findById(hostId).orElse(null);
+
+                    Map<String, Object> hostMap = new LinkedHashMap<>();
+                    hostMap.put("hostId", hostId);
+                    hostMap.put("displayName", host != null ? host.getDisplayName() : "Unknown");
+                    hostMap.put("steamId", host != null ? host.getSteamId() : null);
+                    hostMap.put("sessions", hostSessions);
+                    hostMap.put("sessionCount", hostSessions.size());
+                    hostMap.put("activeSession", sessionService.findActiveOrPausedSession(hostId));
+                    return hostMap;
+                })
+                .sorted(Comparator.comparing(m -> (String) m.get("displayName")))
+                .collect(Collectors.toList());
+    }
 }

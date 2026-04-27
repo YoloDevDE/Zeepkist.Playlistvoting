@@ -32,6 +32,7 @@ public class SteamAuthRestController
             log.info("Steam ticket verified successfully for steamId: {}", steamId);
             User user = authService.findOrCreateUser(steamId);
             return ResponseEntity.ok(Map.of(
+                    "id", user.getId(),
                     "token", user.getToken(),
                     "displayName", user.getDisplayName(),
                     "steamId", steamId

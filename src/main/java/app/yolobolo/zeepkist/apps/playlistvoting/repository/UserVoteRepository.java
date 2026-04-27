@@ -13,5 +13,7 @@ public interface UserVoteRepository extends MongoRepository<UserVote, String>
 {
     List<UserVote> findBySessionIdAndLevelUid(String sessionId, String levelUid);
 
+    void deleteBySessionId(String sessionId);
+
     Optional<UserVote> findBySessionIdAndLevelUidAndPlatformAndPlatformUserId(String sessionId, String levelUid, Platform platform, String platformUserId);
 }
