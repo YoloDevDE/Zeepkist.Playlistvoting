@@ -212,7 +212,7 @@
 
         function fetchDashboardData() {
             console.log('Fetching dashboard data...');
-            let url = '/api/playlistvoting/dashboard/live';
+            let url = '/api/playlistvoting/dashboard';
             if (currentViewHostId) {
                 url += '?hostId=' + currentViewHostId;
             }
@@ -246,11 +246,11 @@
         }
 
         function renderDashboard(data) {
-            renderActiveLevel(data.currentLevel, data.currentVotes, data.activeSessionName);
+            renderActiveLevel(data.currentLevel, data.currentVotes, data.activeSessionName, data.lobbyTimer);
             renderSessions(data.sessions);
         }
 
-        function renderActiveLevel(level, votes, activeSessionName) {
+        function renderActiveLevel(level, votes, activeSessionName, lobbyTimer) {
             const $panel = $('#activeLevelPanel');
             if (!$panel.length) return;
 
@@ -321,9 +321,15 @@
                     <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                         <svg class="w-24 h-24" fill="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                     </div>
-                    <div class="mb-4">
-                        <p class="text-brand-muted font-bold uppercase tracking-widest text-[10px] mb-1">Active Session</p>
-                        <h3 class="text-xl font-black text-white">${activeSessionName}</h3>
+                    <div class="mb-4 flex justify-between items-start">
+                        <div>
+                            <p class="text-brand-muted font-bold uppercase tracking-widest text-[10px] mb-1">Active Session</p>
+                            <h3 class="text-xl font-black text-white">${activeSessionName}</h3>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-brand-muted font-bold uppercase tracking-widest text-[10px] mb-1">Lobby Timer</p>
+                            <h3 class="text-2xl font-black text-brand-accent">${lobbyTimer || '0:00'}</h3>
+                        </div>
                     </div>
                     <div class="h-px w-full bg-slate-800 mb-6"></div>
                     <p class="text-brand-accent font-bold uppercase tracking-widest text-xs mb-2 flex items-center gap-2">
@@ -382,7 +388,7 @@
                 if (isOwner) {
                     actionsHtml = `
                         <div class="flex items-center gap-3">
-                            <a href="/api/playlistvoting/session/${session.id}/playlist/download" 
+                            <a href="/api/playlistvoting/sessions/${session.id}/playlist"
                                class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all border border-slate-700 flex items-center gap-2">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                                 DOWNLOAD .ZEEPLIST
@@ -487,6 +493,7 @@
                                     <h5 class="font-bold">${level.name}</h5>
                                     <span class="text-[10px] text-brand-muted">by ${level.author}</span>
                                     ${level.isCurrent ? '<span class="bg-brand-accent/20 text-brand-accent text-[9px] px-1.5 py-0.5 rounded font-black uppercase">CURRENT</span>' : ''}
+                                    ${level.status === 'VOTING_FINISHED' ? '<span class="bg-slate-700/50 text-slate-400 text-[9px] px-1.5 py-0.5 rounded font-black uppercase">Voting Finished</span>' : ''}
                                     ${level.workshopID ? `<a href="https://steamcommunity.com/sharedfiles/filedetails/?id=${level.workshopID}" target="_blank" class="text-steam-accent hover:underline text-[10px]" onclick="event.stopPropagation()">Steam Workshop</a>` : ''}
                                 </div>
                             </div>
@@ -560,8 +567,8 @@
 
         function updateState(id, state) {
             $.ajax({
-                url: `/api/playlistvoting/session/${id}/state`,
-                method: 'POST',
+                url: `/api/playlistvoting/sessions/${id}/state`,
+                method: 'PATCH',
                 contentType: 'application/json',
                 data: JSON.stringify({state: state}),
                 success: fetchDashboardData,
@@ -576,8 +583,8 @@
             if (newName === null || newName === currentName || newName.trim() === '') return;
 
             $.ajax({
-                url: `/api/playlistvoting/session/${id}/rename`,
-                method: 'POST',
+                url: `/api/playlistvoting/sessions/${id}`,
+                method: 'PATCH',
                 contentType: 'application/json',
                 data: JSON.stringify({name: newName}),
                 success: fetchDashboardData,
@@ -590,10 +597,8 @@
         function deleteSession(id) {
             if (!confirm('Really delete session?')) return;
             $.ajax({
-                url: `/api/playlistvoting/session/${id}/delete`,
-                method: 'POST',
-                contentType: 'application/json',
-                data: JSON.stringify({}),
+                url: `/api/playlistvoting/sessions/${id}`,
+                method: 'DELETE',
                 success: fetchDashboardData,
                 error: function () {
                     alert('Failed to delete session');
@@ -604,10 +609,8 @@
         function resetVotes(id) {
             if (!confirm('Really reset ALL votes for this session? This cannot be undone.')) return;
             $.ajax({
-                url: `/api/playlistvoting/session/${id}/reset-votes`,
-                method: 'POST',
-                contentType: 'application/json',
-                data: JSON.stringify({}),
+                url: `/api/playlistvoting/sessions/${id}/votes`,
+                method: 'DELETE',
                 success: fetchDashboardData,
                 error: function () {
                     alert('Failed to reset votes');
@@ -618,7 +621,7 @@
         function deleteVote(voteId) {
             if (!confirm('Remove this vote?')) return;
             $.ajax({
-                url: `/api/playlistvoting/vote/${voteId}`,
+                url: `/api/playlistvoting/votes/${voteId}`,
                 method: 'DELETE',
                 success: fetchDashboardData,
                 error: function () {
@@ -629,7 +632,7 @@
 
         function castDashboardVote(option) {
             $.ajax({
-                url: '/api/playlistvoting/dashboard/vote',
+                url: '/api/playlistvoting/dashboard/votes',
                 method: 'POST',
                 data: {
                     hostId: currentViewHostId,
@@ -653,7 +656,7 @@
             }
 
             $.ajax({
-                url: '/api/playlistvoting/session/create',
+                url: '/api/playlistvoting/sessions',
                 method: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify({name: name}),

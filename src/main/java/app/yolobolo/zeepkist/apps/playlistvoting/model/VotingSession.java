@@ -7,7 +7,9 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @Document
@@ -19,15 +21,19 @@ public class VotingSession
     private String displayName;
     private String currentLevelUid;
     private List<String> playedLevels;
+    private Map<String, String> levelStatuses;
     private SessionState state;
     private Instant createdAt;
     private Instant lastUsed;
+    private String lobbyTimer;
 
     public VotingSession()
     {
         this.playedLevels = new ArrayList<>();
+        this.levelStatuses = new HashMap<>();
         this.state = SessionState.ACTIVE;
         this.createdAt = Instant.now();
         this.lastUsed = Instant.now();
+        this.lobbyTimer = "0:00";
     }
 }

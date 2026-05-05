@@ -11,16 +11,18 @@ import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.response.VotingResult
 import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.Platform;
 import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.VoteOption;
 import app.yolobolo.zeepkist.apps.playlistvoting.service.VoteService;
-import app.yolobolo.zeepkist.common.model.User;
-import jakarta.servlet.http.HttpSession;
+import app.yolobolo.zeepkist.common.model.SteamUserPrincipal;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
+import java.util.Optional;
 
 @Slf4j
 @RestController
@@ -34,178 +36,155 @@ public class PlaylistVotingRestController
     // --- Host ---
 
     @GetMapping("/token")
-    String token(HttpSession session)
+    public ResponseEntity<String> getToken(@AuthenticationPrincipal SteamUserPrincipal principal)
     {
-        String hostId = (String) session.getAttribute("hostId");
-        if (hostId == null)
+        if (principal == null)
         {
-            return "Unauthorized";
+            return ResponseEntity.status(401).build();
         }
 
-        User user = voteService.findUserById(hostId);
-        if (user == null)
-        {
-            return "User not found";
-        }
-
-        log.info("Token retrieved for user: {}", user.getId());
-        return user.getToken();
+        log.info("Token retrieved for user: {}", principal.getHostId());
+        return ResponseEntity.ok(principal.getToken());
     }
 
     // --- Session ---
 
-    @PostMapping(value = "/session/{id}/rename", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Void> renameSessionById(@PathVariable String id, @RequestBody RenameSessionRequest request, HttpSession session)
+    @PatchMapping("/sessions/{id}")
+    public ResponseEntity<Void> updateSession(@PathVariable String id, @RequestBody RenameSessionRequest request, @AuthenticationPrincipal SteamUserPrincipal principal)
     {
-        String hostId = (String) session.getAttribute("hostId");
-        if (hostId == null)
+        if (principal == null)
         {
             return ResponseEntity.status(401).build();
         }
-        voteService.renameSession(id, request.getName(), hostId);
-        return ResponseEntity.ok().build();
+        voteService.renameSession(id, request.getName(), principal.getHostId());
+        return ResponseEntity.noContent().build();
     }
 
-    @PostMapping(value = "/session/{id}/state", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Void> changeSessionState(@PathVariable String id, @RequestBody SessionStateRequest request, HttpSession session)
+    @PatchMapping("/sessions/{id}/state")
+    public ResponseEntity<Void> updateSessionState(@PathVariable String id, @RequestBody SessionStateRequest request, @AuthenticationPrincipal SteamUserPrincipal principal)
     {
-        String hostId = (String) session.getAttribute("hostId");
-        if (hostId == null)
+        if (principal == null)
         {
             return ResponseEntity.status(401).build();
         }
-        voteService.updateSessionState(id, request.getState(), hostId);
-        return ResponseEntity.ok().build();
+        voteService.updateSessionState(id, request.getState(), principal.getHostId());
+        return ResponseEntity.noContent().build();
     }
 
-    @PostMapping(value = "/session/{id}/reset-votes", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Void> resetVotes(@PathVariable String id, HttpSession session)
+    @DeleteMapping("/sessions/{id}/votes")
+    public ResponseEntity<Void> resetSessionVotes(@PathVariable String id, @AuthenticationPrincipal SteamUserPrincipal principal)
     {
-        String hostId = (String) session.getAttribute("hostId");
-        if (hostId == null)
+        if (principal == null)
         {
             return ResponseEntity.status(401).build();
         }
-        voteService.resetVotes(id, hostId);
-        return ResponseEntity.ok().build();
+        voteService.resetVotes(id, principal.getHostId());
+        return ResponseEntity.noContent().build();
     }
 
-    @DeleteMapping(value = "/vote/{id}")
-    public ResponseEntity<Void> deleteVote(@PathVariable String id, HttpSession session)
+    @DeleteMapping("/votes/{id}")
+    public ResponseEntity<Void> deleteVote(@PathVariable String id, @AuthenticationPrincipal SteamUserPrincipal principal)
     {
-        String hostId = (String) session.getAttribute("hostId");
-        if (hostId == null)
+        if (principal == null)
         {
             return ResponseEntity.status(401).build();
         }
-        voteService.deleteVote(id, hostId);
-        return ResponseEntity.ok().build();
+        voteService.deleteVote(id, principal.getHostId());
+        return ResponseEntity.noContent().build();
     }
 
-    @PostMapping(value = "/session/{id}/delete", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Void> deleteSession(@PathVariable String id, HttpSession session)
+    @DeleteMapping("/sessions/{id}")
+    public ResponseEntity<Void> deleteSession(@PathVariable String id, @AuthenticationPrincipal SteamUserPrincipal principal)
     {
-        String hostId = (String) session.getAttribute("hostId");
-        if (hostId == null)
+        if (principal == null)
         {
             return ResponseEntity.status(401).build();
         }
-        voteService.deleteSession(id, hostId);
-        return ResponseEntity.ok().build();
+        voteService.deleteSession(id, principal.getHostId());
+        return ResponseEntity.noContent().build();
     }
 
-    @PostMapping(value = "/session/create", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<String> createSession(@RequestBody CreateSessionRequest request, HttpSession session)
+    @PostMapping("/sessions")
+    public ResponseEntity<String> createSession(@RequestBody CreateSessionRequest request, @AuthenticationPrincipal SteamUserPrincipal principal)
     {
-        String token = (String) session.getAttribute("token");
-        log.info("Create session requested - name: {}, token: {}", request.getName(), token);
-        if (token == null)
+        if (principal == null)
         {
-            return ResponseEntity.status(401).body("Unauthorized");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        VotingSession votingSession = voteService.createSession(token, request.getName());
+        log.info("Create session requested - name: {}, user: {}", request.getName(), principal.getHostId());
+
+        return Optional.ofNullable(voteService.createSession(principal.getToken(), request.getName()))
+                .map(session -> ResponseEntity.status(HttpStatus.CREATED)
+                        .body("Session created: " + session.getDisplayName()))
+                .orElseGet(() -> ResponseEntity.badRequest().body("Failed to create session"));
+    }
+
+    @PatchMapping("/sessions/active")
+    public ResponseEntity<String> renameActiveSession(@RequestBody RenameSessionRequest request, @AuthenticationPrincipal SteamUserPrincipal principal)
+    {
+        if (principal == null)
+        {
+            return ResponseEntity.status(401).build();
+        }
+
+        log.info("Rename active session requested - new name: {}, user: {}", request.getName(), principal.getHostId());
+        VotingSession votingSession = voteService.renameActiveSession(principal.getToken(), request.getName());
         if (votingSession == null)
         {
-            log.warn("Create session failed - token not found or invalid");
-            return ResponseEntity.badRequest().body("Token not found");
-        }
-        return ResponseEntity.ok("Session created: " + votingSession.getDisplayName());
-    }
-
-    @PostMapping(value = "/session/rename", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<String> renameSession(@RequestBody RenameSessionRequest request, HttpSession session)
-    {
-        String token = (String) session.getAttribute("token");
-        log.info("Rename session requested - new name: {}, token: {}", request.getName(), token);
-        if (token == null)
-        {
-            return ResponseEntity.status(401).body("Unauthorized");
-        }
-
-        VotingSession votingSession = voteService.renameActiveSession(token, request.getName());
-        if (votingSession == null)
-        {
-            log.warn("Rename session failed - no active session for token: {}", token);
             return ResponseEntity.badRequest().body("No active session found");
         }
         return ResponseEntity.ok("Session renamed to: " + votingSession.getDisplayName());
     }
 
-    @PostMapping(value = "/session/pause", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<String> pauseSession(HttpSession session)
+    @PostMapping("/sessions/active/pause")
+    public ResponseEntity<String> pauseActiveSession(@AuthenticationPrincipal SteamUserPrincipal principal)
     {
-        String token = (String) session.getAttribute("token");
-        log.info("Pause session requested for token: {}", token);
-        if (token == null)
+        if (principal == null)
         {
-            return ResponseEntity.status(401).body("Unauthorized");
+            return ResponseEntity.status(401).build();
         }
 
-        VotingSession votingSession = voteService.pauseSession(token);
+        log.info("Pause session requested for user: {}", principal.getHostId());
+        VotingSession votingSession = voteService.pauseSession(principal.getToken());
         if (votingSession == null)
         {
-            log.warn("Pause session failed - no active session for token: {}", token);
             return ResponseEntity.badRequest().body("No active session found");
         }
         return ResponseEntity.ok("Session paused: " + votingSession.getDisplayName());
     }
 
-    @PostMapping(value = "/session/resume", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<String> resumeSession(HttpSession session)
+    @PostMapping("/sessions/active/resume")
+    public ResponseEntity<String> resumeActiveSession(@AuthenticationPrincipal SteamUserPrincipal principal)
     {
-        String token = (String) session.getAttribute("token");
-        log.info("Resume session requested for token: {}", token);
-        if (token == null)
+        if (principal == null)
         {
-            return ResponseEntity.status(401).body("Unauthorized");
+            return ResponseEntity.status(401).build();
         }
 
-        VotingSession votingSession = voteService.resumeSession(token);
+        log.info("Resume session requested for user: {}", principal.getHostId());
+        VotingSession votingSession = voteService.resumeSession(principal.getToken());
         if (votingSession == null)
         {
-            log.warn("Resume session failed - no paused session for token: {}", token);
             return ResponseEntity.badRequest().body("No paused session found");
         }
         return ResponseEntity.ok("Session resumed: " + votingSession.getDisplayName());
     }
 
-    @GetMapping("/session/{id}/playlist/download")
+    @GetMapping("/sessions/{id}/playlist")
     public ResponseEntity<byte[]> downloadPlaylist(
             @PathVariable String id,
             @RequestParam(defaultValue = "360") int roundLength,
             @RequestParam(defaultValue = "true") boolean shuffle,
             @RequestParam(required = false) String name,
-            HttpSession session) throws Exception
+            @AuthenticationPrincipal SteamUserPrincipal principal) throws Exception
     {
-
-        String hostId = (String) session.getAttribute("hostId");
-        if (hostId == null)
+        if (principal == null)
         {
             return ResponseEntity.status(401).build();
         }
 
-        byte[] json = voteService.downloadPlaylist(id, roundLength, shuffle, name, hostId);
+        byte[] json = voteService.downloadPlaylist(id, roundLength, shuffle, name, principal.getHostId());
         if (json == null)
         {
             return ResponseEntity.notFound().build();
@@ -220,50 +199,48 @@ public class PlaylistVotingRestController
     }
     // --- Voting ---
 
-    @GetMapping("/vote")
-    String vote(
-            HttpSession session,
+    @GetMapping("/votes")
+    public ResponseEntity<String> vote(
+            @AuthenticationPrincipal SteamUserPrincipal principal,
             @RequestParam(required = false) String token,
             @RequestParam String platformUserId,
             @RequestParam String username,
             @RequestParam Platform platform,
             @RequestParam VoteOption vote)
     {
-        if (token == null)
+        String effectiveToken = (principal != null) ? principal.getToken() : token;
+
+        log.info("Vote received - user: {} ({}), platform: {}, option: {}, token provided: {}",
+                platformUserId, username, platform, vote, token != null);
+
+        if (effectiveToken == null)
         {
-            token = (String) session.getAttribute("token");
+            return ResponseEntity.status(401).body("Unauthorized");
         }
-        log.info("Vote received - user: {} ({}),  platform: {}, option: {}", platformUserId, username, platform, vote);
-        if (token == null)
-        {
-            return "Unauthorized";
-        }
-        return voteService.vote(token, platformUserId, username, platform, vote);
+        return ResponseEntity.ok(voteService.vote(effectiveToken, platformUserId, username, platform, vote));
     }
 
-    @PostMapping("/reset")
-    String reset(HttpSession session)
+    @DeleteMapping("/sessions/active/votes")
+    public ResponseEntity<String> resetActiveSessionVotes(@AuthenticationPrincipal SteamUserPrincipal principal)
     {
-        String token = (String) session.getAttribute("token");
-        log.info("Reset requested for token: {}", token);
-        if (token == null)
+        if (principal == null)
         {
-            return "Unauthorized";
+            return ResponseEntity.status(401).build();
         }
-        return voteService.reset(token);
+        log.info("Reset active session votes requested for user: {}", principal.getHostId());
+        return ResponseEntity.ok(voteService.reset(principal.getToken()));
     }
 
     // --- Get ---
 
-    @GetMapping("/result")
-    ResponseEntity<VotingResultResponse> getResult(HttpSession session)
+    @GetMapping("/sessions/active/result")
+    public ResponseEntity<VotingResultResponse> getActiveSessionResult(@AuthenticationPrincipal SteamUserPrincipal principal)
     {
-        String token = (String) session.getAttribute("token");
-        if (token == null)
+        if (principal == null)
         {
             return ResponseEntity.status(401).build();
         }
-        VotingResultResponse result = voteService.getResult(token);
+        VotingResultResponse result = voteService.getResult(principal.getToken());
         if (result == null)
         {
             return ResponseEntity.badRequest().build();
@@ -271,16 +248,14 @@ public class PlaylistVotingRestController
         return ResponseEntity.ok(result);
     }
 
-    @GetMapping("/currentLevel")
-    ResponseEntity<String> getCurrentLevel(HttpSession session)
+    @GetMapping("/sessions/active/level")
+    public ResponseEntity<String> getActiveSessionLevel(@AuthenticationPrincipal SteamUserPrincipal principal)
     {
-        String token = (String) session.getAttribute("token");
-        log.debug("Current level requested for token: {}", token);
-        if (token == null)
+        if (principal == null)
         {
             return ResponseEntity.status(401).build();
         }
-        Level level = voteService.getCurrentLevel(token);
+        Level level = voteService.getCurrentLevel(principal.getToken());
         if (level == null)
         {
             return ResponseEntity.badRequest().body("No level currently set");
@@ -288,16 +263,14 @@ public class PlaylistVotingRestController
         return ResponseEntity.ok(level.toString());
     }
 
-    @GetMapping("/playlist")
-    public ResponseEntity<PlaylistResponse> getPlaylist(HttpSession session)
+    @GetMapping("/sessions/active/playlist")
+    public ResponseEntity<PlaylistResponse> getActiveSessionPlaylist(@AuthenticationPrincipal SteamUserPrincipal principal)
     {
-        String token = (String) session.getAttribute("token");
-        log.debug("Playlist requested for token: {}", token);
-        if (token == null)
+        if (principal == null)
         {
             return ResponseEntity.status(401).build();
         }
-        PlaylistResponse playlist = voteService.getPlaylist(token);
+        PlaylistResponse playlist = voteService.getPlaylist(principal.getToken());
         if (playlist == null)
         {
             return ResponseEntity.badRequest().build();
@@ -305,52 +278,69 @@ public class PlaylistVotingRestController
         return ResponseEntity.ok(playlist);
     }
 
-    @GetMapping("/dashboard/live")
-    public ResponseEntity<Map<String, Object>> liveDashboard(
+    @GetMapping("/dashboard")
+    public ResponseEntity<Map<String, Object>> getDashboardData(
             @RequestParam(required = false) String hostId,
-            HttpSession session)
+            @AuthenticationPrincipal SteamUserPrincipal principal)
     {
-        String token = (String) session.getAttribute("token");
-        String effectiveHostId = hostId != null ? hostId : (String) session.getAttribute("hostId");
+        String token = principal != null ? principal.getToken() : null;
+        String effectiveHostId = hostId != null ? hostId : (principal != null ? principal.getHostId() : null);
 
         return ResponseEntity.ok(voteService.getDashboardData(token, effectiveHostId));
     }
 
-    @PostMapping("/dashboard/vote")
-    public ResponseEntity<String> dashboardVote(
+    @PostMapping("/dashboard/votes")
+    public ResponseEntity<String> castDashboardVote(
             @RequestParam String hostId,
             @RequestParam VoteOption vote,
-            HttpSession session)
+            @AuthenticationPrincipal SteamUserPrincipal principal)
     {
-        String steamId = (String) session.getAttribute("steamId");
-        String steamName = (String) session.getAttribute("steamName");
-
-        if (steamId == null)
+        if (principal == null)
         {
             return ResponseEntity.status(401).body("You must be logged in to vote");
         }
 
-        String result = voteService.voteByHostId(hostId, steamId, steamName, Platform.STEAM, vote);
-        return ResponseEntity.ok(result);
+        log.info("Dashboard vote cast by user: {} (Steam: {}) for host: {} - option: {}",
+                principal.getHostId(), principal.getSteamId(), hostId, vote);
+
+        return ResponseEntity.ok(voteService.voteByHostId(hostId, principal.getSteamId(), principal.getDisplayName(), Platform.STEAM, vote));
     }
+
     // --- Set ---
 
-    @PostMapping(value = "/currentLevel", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
-    public ResponseEntity<String> setCurrentLevel(SetLevelRequest request, HttpSession session)
+    @PostMapping(value = "/sessions/active/level", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+    public ResponseEntity<String> setCurrentLevel(SetLevelRequest request, @AuthenticationPrincipal SteamUserPrincipal principal)
     {
-        String token = (String) session.getAttribute("token");
-        log.info("Set level requested via FORM - token: {}, uid: {}, name: {}, author: {}, workshopID: {}",
-                token, request.getUid(), request.getName(), request.getAuthor(), request.getWorkshopID());
-        return processSetLevel(request, token);
+        if (principal == null)
+        {
+            return ResponseEntity.status(401).body("Unauthorized");
+        }
+        log.info("Set level requested via FORM - user: {}, uid: {}, name: {}",
+                principal.getHostId(), request.getUid(), request.getName());
+        return processSetLevel(request, principal.getToken());
     }
 
-    @PostMapping(value = "/currentLevel", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<String> setCurrentLevelJson(@RequestBody SetLevelRequest request, HttpSession session)
+    @PostMapping(value = "/sessions/active/level", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<String> setCurrentLevelJson(@RequestBody SetLevelRequest request, @AuthenticationPrincipal SteamUserPrincipal principal)
     {
-        String token = (String) session.getAttribute("token");
-        log.info("Set level requested via JSON - token: {}, uid: {}, name: {}, author: {}, workshopID: {}",
-                token, request.getUid(), request.getName(), request.getAuthor(), request.getWorkshopID());
-        return processSetLevel(request, token);
+        if (principal == null)
+        {
+            return ResponseEntity.status(401).body("Unauthorized");
+        }
+        log.info("Set level requested via JSON - user: {}, uid: {}, name: {}",
+                principal.getHostId(), request.getUid(), request.getName());
+        return processSetLevel(request, principal.getToken());
+    }
+
+    @PostMapping("/sessions/active/timer")
+    public ResponseEntity<Void> updateLobbyTimer(@RequestParam String timer, @AuthenticationPrincipal SteamUserPrincipal principal)
+    {
+        if (principal == null)
+        {
+            return ResponseEntity.status(401).build();
+        }
+        voteService.updateLobbyTimer(principal.getToken(), timer);
+        return ResponseEntity.noContent().build();
     }
 
     private ResponseEntity<String> processSetLevel(SetLevelRequest request, String token)

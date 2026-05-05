@@ -187,7 +187,12 @@ public class VoteService
         VotingSession session = findActiveSession(token);
         if (session == null)
         {
-            return "No active session found";
+            log.info("No active session found for token, creating default session...");
+            session = createSession(token, "Default Session");
+            if (session == null)
+            {
+                return "No active session found and failed to create default session";
+            }
         }
         if (session.getState() == SessionState.PAUSED)
         {
@@ -196,15 +201,38 @@ public class VoteService
 
         Level level = levelService.getOrCreateLevel(uid, name, author, workshopID);
 
+        if (session.getCurrentLevelUid() != null && !session.getCurrentLevelUid().equals(uid))
+        {
+            session.getLevelStatuses().put(session.getCurrentLevelUid(), "VOTING_FINISHED");
+        }
+
         if (!session.getPlayedLevels().contains(uid))
         {
             session.getPlayedLevels().add(uid);
         }
         session.setCurrentLevelUid(uid);
+        session.getLevelStatuses().put(uid, "VOTING_ACTIVE");
         sessionService.save(session);
         log.info("Current level set to '{}' in session '{}'", name, session.getDisplayName());
         notifyUpdate(session.getHostId());
         return "Level set to: " + level.getName() + " by " + level.getAuthor();
+    }
+
+    public void updateLobbyTimer(String token, String timer)
+    {
+        VotingSession session = findActiveSession(token);
+        if (session == null)
+        {
+            log.info("No active session found for token, creating default session for timer update...");
+            session = createSession(token, "Default Session");
+        }
+
+        if (session != null)
+        {
+            session.setLobbyTimer(timer);
+            sessionService.save(session);
+            notifyUpdate(session.getHostId());
+        }
     }
 
     // --- Voting ---
@@ -279,11 +307,13 @@ public class VoteService
         return VotingResultResponse.builder()
                 .sessionName(session.getDisplayName())
                 .sessionState(session.getState().name())
+                .lobbyTimer(session.getLobbyTimer())
                 .level(LevelResponse.builder()
                         .levelUid(session.getCurrentLevelUid())
                         .levelName(level != null ? level.getName() : "None")
                         .levelAuthor(level != null ? level.getAuthor() : "None")
                         .workshopId(level != null ? level.getWorkshopID() : null)
+                        .status(session.getLevelStatuses().getOrDefault(session.getCurrentLevelUid(), "VOTING_ACTIVE"))
                         .build())
                 .votes(votesResponse)
                 .build();
@@ -380,6 +410,7 @@ public class VoteService
         if (activeSession != null)
         {
             data.put("activeSessionName", activeSession.getDisplayName());
+            data.put("lobbyTimer", activeSession.getLobbyTimer());
             if (activeSession.getCurrentLevelUid() != null)
             {
                 Level currentLevel = levelService.findById(activeSession.getCurrentLevelUid()).orElse(null);
@@ -428,16 +459,11 @@ public class VoteService
             sm.put("id", s.getId());
             sm.put("name", s.getDisplayName());
             sm.put("state", s.getState().name());
+            sm.put("lobbyTimer", s.getLobbyTimer());
             sm.put("createdAt", s.getCreatedAt() != null ? s.getCreatedAt().toEpochMilli() : null);
 
             var levelsList = new ArrayList<>(s.getPlayedLevels());
             Collections.reverse(levelsList);
-
-            // If session is ACTIVE, only show the current level
-            if (s.getState() == SessionState.ACTIVE && s.getCurrentLevelUid() != null)
-            {
-                levelsList = new ArrayList<>(List.of(s.getCurrentLevelUid()));
-            }
 
             var levels = levelsList.stream().map(uid ->
             {
@@ -450,6 +476,7 @@ public class VoteService
                 lm.put("author", levelInfo != null ? levelInfo.getAuthor() : "");
                 lm.put("workshopID", levelInfo != null ? levelInfo.getWorkshopID() : 0);
                 lm.put("isCurrent", uid.equals(s.getCurrentLevelUid()));
+                lm.put("status", s.getLevelStatuses().getOrDefault(uid, "VOTING_ACTIVE"));
 
                 var individualVotes = lvlVotes.stream()
                         .sorted(Comparator.comparing(UserVote::getModifiedAt).reversed())

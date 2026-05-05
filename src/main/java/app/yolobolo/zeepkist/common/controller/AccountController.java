@@ -1,12 +1,11 @@
 package app.yolobolo.zeepkist.common.controller;
 
 import app.yolobolo.zeepkist.apps.playlistvoting.service.VoteService;
+import app.yolobolo.zeepkist.common.model.SteamUserPrincipal;
 import app.yolobolo.zeepkist.common.model.User;
-import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,10 +26,14 @@ public class AccountController
     private final VoteService voteService;
 
     @GetMapping
-    public String profile(HttpSession session, Model model, @AuthenticationPrincipal UserDetails userDetails)
+    public String profile(Model model, @AuthenticationPrincipal SteamUserPrincipal principal)
     {
-        String hostId = (String) session.getAttribute("hostId");
-        User user = voteService.findUserById(hostId);
+        if (principal == null)
+        {
+            return "redirect:/login";
+        }
+
+        User user = voteService.findUserById(principal.getHostId());
 
         List<User> managers = user != null && user.getManagerIds() != null
                 ? user.getManagerIds().stream()
@@ -39,22 +42,22 @@ public class AccountController
                   .toList()
                 : List.of();
 
-        model.addAttribute("loggedIn", true);
-        model.addAttribute("steamName", session.getAttribute("steamName"));
-        model.addAttribute("steamId", session.getAttribute("steamId"));
-        model.addAttribute("displayName", session.getAttribute("displayName"));
-        model.addAttribute("token", session.getAttribute("token"));
         model.addAttribute("host", user);
         model.addAttribute("managers", managers);
-        model.addAttribute("username", (userDetails != null ? userDetails.getUsername() : session.getAttribute("displayName")));
+        model.addAttribute("username", principal.getDisplayName());
 
         return "common/profile";
     }
 
     @PostMapping("/manager/add")
-    public String addManager(@RequestParam String steamId, HttpSession session)
+    public String addManager(@RequestParam String steamId, @AuthenticationPrincipal SteamUserPrincipal principal)
     {
-        String hostId = (String) session.getAttribute("hostId");
+        if (principal == null)
+        {
+            return "redirect:/login";
+        }
+
+        String hostId = principal.getHostId();
         User user = voteService.findUserById(hostId);
         if (user != null && !user.getManagerIds().contains(steamId))
         {
@@ -66,9 +69,14 @@ public class AccountController
     }
 
     @PostMapping("/manager/remove")
-    public String removeManager(@RequestParam String steamId, HttpSession session)
+    public String removeManager(@RequestParam String steamId, @AuthenticationPrincipal SteamUserPrincipal principal)
     {
-        String hostId = (String) session.getAttribute("hostId");
+        if (principal == null)
+        {
+            return "redirect:/login";
+        }
+
+        String hostId = principal.getHostId();
         User user = voteService.findUserById(hostId);
         if (user != null)
         {
@@ -80,15 +88,19 @@ public class AccountController
     }
 
     @PostMapping("/token/refresh")
-    public String refreshToken(HttpSession session)
+    public String refreshToken(@AuthenticationPrincipal SteamUserPrincipal principal)
     {
-        String hostId = (String) session.getAttribute("hostId");
+        if (principal == null)
+        {
+            return "redirect:/login";
+        }
+
+        String hostId = principal.getHostId();
         User user = voteService.findUserById(hostId);
         if (user != null)
         {
             user.setToken(java.util.UUID.randomUUID().toString().toUpperCase());
             voteService.saveUser(user);
-            session.setAttribute("token", user.getToken());
             log.info("Token refreshed for host user {}", hostId);
         }
         return "redirect:/profile";

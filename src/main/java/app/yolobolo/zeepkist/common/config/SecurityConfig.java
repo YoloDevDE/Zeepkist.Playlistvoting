@@ -1,5 +1,6 @@
 package app.yolobolo.zeepkist.common.config;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -9,7 +10,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableWebSecurity
-@lombok.RequiredArgsConstructor
+@RequiredArgsConstructor
 public class SecurityConfig
 {
 
@@ -19,16 +20,25 @@ public class SecurityConfig
     public SecurityFilterChain playlistVotingSecurityFilterChain(HttpSecurity http)
     {
         http
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/", "/playlistvoting/**", "/navigation", "/error", "/login", "/logout", "/css/**", "/js/**", "/api/auth/steam/**", "/ws-dashboard/**").permitAll()
-                        .requestMatchers("/auth/**").permitAll()
-                        .requestMatchers("/api/playlistvoting/dashboard/live").permitAll()
-                        .requestMatchers("/api/playlistvoting/vote"
-                                , "/api/playlistvoting/result"
-                                , "/api/playlistvoting/currentLevel/**"
-                                , "/api/playlistvoting/playlist"
-                                , "/api/playlistvoting/reset").authenticated() // API Endpunkte für das Spiel/Public - nun via Token/Session auth
-                        .anyRequest().authenticated()
+                .authorizeHttpRequests(
+                        auth -> auth
+                                .requestMatchers(
+                                        "/",
+                                        "/api/auth/steam/**",
+                                        "/api/playlistvoting/dashboard",
+                                        "/api/playlistvoting/votes",
+                                        "/auth/**",
+                                        "/css/**",
+                                        "/error",
+                                        "/js/**",
+                                        "/login",
+                                        "/logout",
+                                        "/navigation",
+                                        "/playlistvoting/**",
+                                        "/ws-dashboard/**"
+                                ).permitAll()
+
+                                .anyRequest().authenticated()
                 )
                 .logout(logout -> logout
                         .logoutUrl("/auth/logout")
@@ -36,7 +46,7 @@ public class SecurityConfig
                         .permitAll()
                 )
                 .csrf(csrf -> csrf
-                        .ignoringRequestMatchers("/api/playlistvoting/**", "/api/auth/steam/**", "/ws-dashboard/**", "/ws-dashboard")
+                        .ignoringRequestMatchers("/api/**", "/ws-dashboard/**")
                 )
                 .headers(headers -> headers
                         .frameOptions(org.springframework.security.config.annotation.web.configurers.HeadersConfigurer.FrameOptionsConfig::disable)
