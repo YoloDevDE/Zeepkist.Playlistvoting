@@ -8,6 +8,7 @@ public class CreateSessionRequest
 {
     private String name;
     private boolean playlistMode;
+    private boolean allowAbstain;
     private double roundLength;
     private ZeeplistDTO zeeplist;
 }

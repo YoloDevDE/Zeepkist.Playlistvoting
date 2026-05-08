@@ -5,6 +5,7 @@ import app.yolobolo.zeepkist.apps.playlistvoting.model.UserVote;
 import app.yolobolo.zeepkist.apps.playlistvoting.model.VotingSession;
 import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.ZeeplistDTO;
 import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.request.CreateSessionRequest;
+import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.request.SessionSettingsRequest;
 import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.request.UpdatePlaylistRequest;
 import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.response.LevelResponse;
 import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.response.PlaylistResponse;
@@ -112,6 +113,7 @@ public class VoteService
         if (session != null)
         {
             session.setPlaylistMode(request.isPlaylistMode());
+            session.setAllowAbstain(request.isAllowAbstain());
             if (request.getZeeplist() != null)
             {
                 applyZeeplistToSession(session, request.getZeeplist());
@@ -329,6 +331,10 @@ public class VoteService
         else
         {
             VoteOption actualOption = (option == VoteOption.IDK) ? (new Random().nextBoolean() ? VoteOption.YES : VoteOption.NO) : option;
+            if (actualOption == VoteOption.ABSTAIN && !session.isAllowAbstain())
+            {
+                return "Abstain votes are disabled for this session | " + getVoteSummary(session);
+            }
             result = voteProcessingService.castVote(session.getId(), session.getCurrentLevelUid(), platformUserId, platformUsername, platform, actualOption);
         }
 
@@ -361,7 +367,7 @@ public class VoteService
         Level level = session.getCurrentLevelUid() != null ? levelService.findById(session.getCurrentLevelUid()).orElse(null) : null;
         List<UserVote> votes = session.getCurrentLevelUid() != null ? voteProcessingService.getVotes(session.getId(), session.getCurrentLevelUid()) : List.of();
 
-        VotesResponse votesResponse = voteProcessingService.calculateVotesResponse(votes);
+        VotesResponse votesResponse = voteProcessingService.calculateVotesResponse(votes, session.isAllowAbstain());
 
         return VotingResultResponse.builder()
                 .sessionName(session.getDisplayName())
@@ -382,8 +388,15 @@ public class VoteService
     private String getVoteSummary(VotingSession session)
     {
         List<UserVote> votes = voteProcessingService.getVotes(session.getId(), session.getCurrentLevelUid());
-        VotesResponse votesResponse = voteProcessingService.calculateVotesResponse(votes);
-        return "%d/%d/%d (y/n/a)".formatted(votesResponse.getYes(), votesResponse.getNo(), votesResponse.getAbstain());
+        VotesResponse votesResponse = voteProcessingService.calculateVotesResponse(votes, session.isAllowAbstain());
+        if (session.isAllowAbstain())
+        {
+            return "%d/%d/%d (y/n/a)".formatted(votesResponse.getYes(), votesResponse.getNo(), votesResponse.getAbstain());
+        }
+        else
+        {
+            return "%d/%d (y/n)".formatted(votesResponse.getYes(), votesResponse.getNo());
+        }
     }
 
     // --- Reset ---
@@ -407,13 +420,17 @@ public class VoteService
                 ? voteProcessingService.getVotes(session.getId(), level.getUid())
                 : List.of();
 
-        VotesResponse votesResponse = voteProcessingService.calculateVotesResponse(votes);
+        VotesResponse votesResponse = voteProcessingService.calculateVotesResponse(votes, session.isAllowAbstain());
 
         session.setCurrentLevelUid(null);
         sessionService.save(session);
 
-        String message = "RESULT<br>%s<br>----------------<br>%d/%d/%d (y/n/a)".formatted(levelInfo, votesResponse.getYes(), votesResponse.getNo(), votesResponse.getAbstain());
-        log.info("Reset - {} | {}/{}/{} (y/n/a)", levelInfo, votesResponse.getYes(), votesResponse.getNo(), votesResponse.getAbstain());
+        String voteSummary = session.isAllowAbstain()
+                ? "%d/%d/%d (y/n/a)".formatted(votesResponse.getYes(), votesResponse.getNo(), votesResponse.getAbstain())
+                : "%d/%d (y/n)".formatted(votesResponse.getYes(), votesResponse.getNo());
+
+        String message = "RESULT<br>%s<br>----------------<br>%s".formatted(levelInfo, voteSummary);
+        log.info("Reset - {} | {}", levelInfo, voteSummary);
         notifyUpdate(session.getHostId());
         return message;
     }
@@ -484,6 +501,7 @@ public class VoteService
                     lvl.put("author", currentLevel.getAuthor());
                     lvl.put("uid", currentLevel.getUid());
                     lvl.put("workshopID", currentLevel.getWorkshopID());
+                    lvl.put("thumbnailUrl", currentLevel.getThumbnailUrl());
                     data.put("currentLevel", lvl);
                 }
                 else
@@ -535,11 +553,12 @@ public class VoteService
                 Level levelInfo = levelService.findById(uid).orElse(null);
                 var lvlVotes = voteProcessingService.getVotes(s.getId(), uid);
 
-                Map<String, Object> lm = getVotesMap(lvlVotes);
+                Map<String, Object> lm = getVotesMap(lvlVotes, s.isAllowAbstain());
                 lm.put("uid", uid);
                 lm.put("name", levelInfo != null ? levelInfo.getName() : uid);
                 lm.put("author", levelInfo != null ? levelInfo.getAuthor() : "");
                 lm.put("workshopID", levelInfo != null ? levelInfo.getWorkshopID() : 0);
+                lm.put("thumbnailUrl", levelInfo != null ? levelInfo.getThumbnailUrl() : null);
                 lm.put("isCurrent", uid.equals(s.getCurrentLevelUid()));
                 lm.put("status", s.getLevelStatuses().getOrDefault(uid, "VOTING_ACTIVE"));
                 lm.put("veto", s.getVetoes() != null ? s.getVetoes().get(uid) : null);
@@ -595,12 +614,14 @@ public class VoteService
 
     private Map<String, Object> getVotesMap(String sessionId, String levelUid)
     {
-        return getVotesMap(voteProcessingService.getVotes(sessionId, levelUid));
+        VotingSession session = sessionService.findById(sessionId).orElse(null);
+        boolean allowAbstain = session != null && session.isAllowAbstain();
+        return getVotesMap(voteProcessingService.getVotes(sessionId, levelUid), allowAbstain);
     }
 
-    private Map<String, Object> getVotesMap(List<UserVote> votes)
+    private Map<String, Object> getVotesMap(List<UserVote> votes, boolean allowAbstain)
     {
-        Map<String, Object> map = voteProcessingService.calculateVotesMap(votes);
+        Map<String, Object> map = voteProcessingService.calculateVotesMap(votes, allowAbstain);
         long yes = (Long) map.get("yes");
         long no = (Long) map.get("no");
         double yesPct = (yes + no) > 0 ? (yes * 100.0 / (yes + no)) : 0;
@@ -644,7 +665,7 @@ public class VoteService
                         }
 
                         List<UserVote> votes = voteProcessingService.getVotes(votingSession.getId(), uid);
-                        VotesResponse vr = voteProcessingService.calculateVotesResponse(votes);
+                        VotesResponse vr = voteProcessingService.calculateVotesResponse(votes, votingSession.isAllowAbstain());
                         return vr.getYes() > vr.getNo();
                     })
                     .toList();
@@ -665,7 +686,7 @@ public class VoteService
                         }
 
                         List<UserVote> votes = voteProcessingService.getVotes(votingSession.getId(), uid);
-                        VotesResponse votesResponse = voteProcessingService.calculateVotesResponse(votes);
+                        VotesResponse votesResponse = voteProcessingService.calculateVotesResponse(votes, votingSession.isAllowAbstain());
                         return votesResponse.getNo() >= votesResponse.getYes() && votesResponse.getNo() > 0;
                     })
                     .toList();
@@ -748,19 +769,60 @@ public class VoteService
         VotingSession session = findActiveSession(token);
         if (session != null)
         {
-            if (request.getZeeplist() != null)
-            {
-                applyZeeplistToSession(session, request.getZeeplist());
-            }
-            else if (request.getPlaylist() != null)
-            {
-                session.setPlaylist(request.getPlaylist());
-            }
-
-            session.setPlaylistMode(request.isPlaylistMode());
-            sessionService.save(session);
-            notifyUpdate(session.getHostId());
+            updateSessionPlaylist(session.getId(), session.getHostId(), request);
         }
+    }
+
+    public void updateSessionPlaylist(String sessionId, String hostId, UpdatePlaylistRequest request)
+    {
+        sessionService.findById(sessionId).ifPresent(session ->
+        {
+            if (session.getHostId().equals(hostId))
+            {
+                if (request.getZeeplist() != null)
+                {
+                    applyZeeplistToSession(session, request.getZeeplist());
+                }
+                else if (request.getPlaylist() != null)
+                {
+                    session.setPlaylist(request.getPlaylist());
+                }
+
+                session.setPlaylistMode(request.isPlaylistMode());
+                sessionService.save(session);
+                notifyUpdate(session.getHostId());
+            }
+        });
+    }
+
+    public void updateSessionSettings(String sessionId, String hostId, SessionSettingsRequest request)
+    {
+        sessionService.findById(sessionId).ifPresent(session ->
+        {
+            if (session.getHostId().equals(hostId))
+            {
+                if (request.getDisplayName() != null)
+                {
+                    session.setDisplayName(request.getDisplayName());
+                }
+                if (request.getPlaylist() != null)
+                {
+                    session.setPlaylist(request.getPlaylist());
+                }
+                session.setPlaylistMode(request.isPlaylistMode());
+                session.setAllowAbstain(request.isAllowAbstain());
+
+                if (request.getState() != null && request.getState() != session.getState())
+                {
+                    sessionService.updateSessionState(sessionId, request.getState(), hostId);
+                }
+                else
+                {
+                    sessionService.save(session);
+                }
+                notifyUpdate(session.getHostId());
+            }
+        });
     }
 
     public void vetoLevel(String token, String uid, String veto)
@@ -771,6 +833,17 @@ public class VoteService
             String levelUid = (uid != null && !uid.isEmpty()) ? uid : session.getCurrentLevelUid();
             if (levelUid != null)
             {
+                vetoLevel(session.getId(), levelUid, veto, session.getHostId());
+            }
+        }
+    }
+
+    public void vetoLevel(String sessionId, String levelUid, String veto, String hostId)
+    {
+        sessionService.findById(sessionId).ifPresent(session ->
+        {
+            if (session.getHostId().equals(hostId))
+            {
                 if (session.getVetoes() == null)
                 {
                     session.setVetoes(new HashMap<>());
@@ -779,7 +852,37 @@ public class VoteService
                 sessionService.save(session);
                 notifyUpdate(session.getHostId());
             }
+        });
+    }
+
+    public void updateLevelStatus(String token, String uid, String status)
+    {
+        VotingSession session = findActiveSession(token);
+        if (session != null)
+        {
+            String levelUid = (uid != null && !uid.isEmpty()) ? uid : session.getCurrentLevelUid();
+            if (levelUid != null)
+            {
+                updateLevelStatus(session.getId(), levelUid, status, session.getHostId());
+            }
         }
+    }
+
+    public void updateLevelStatus(String sessionId, String levelUid, String status, String hostId)
+    {
+        sessionService.findById(sessionId).ifPresent(session ->
+        {
+            if (session.getHostId().equals(hostId))
+            {
+                if (session.getLevelStatuses() == null)
+                {
+                    session.setLevelStatuses(new HashMap<>());
+                }
+                session.getLevelStatuses().put(levelUid, status != null ? status.toUpperCase() : "VOTING_ACTIVE");
+                sessionService.save(session);
+                notifyUpdate(session.getHostId());
+            }
+        });
     }
 
     public List<Map<String, Object>> findAllHostsWithSessions()
@@ -799,6 +902,7 @@ public class VoteService
                     hostMap.put("hostId", hostId);
                     hostMap.put("displayName", host != null ? host.getDisplayName() : "Unknown");
                     hostMap.put("steamId", host != null ? host.getSteamId() : null);
+                    hostMap.put("avatarUrl", host != null ? host.getAvatarUrl() : null);
                     hostMap.put("sessions", hostSessions);
                     hostMap.put("sessionCount", hostSessions.size());
                     hostMap.put("activeSession", sessionService.findActiveOrPausedSession(hostId));

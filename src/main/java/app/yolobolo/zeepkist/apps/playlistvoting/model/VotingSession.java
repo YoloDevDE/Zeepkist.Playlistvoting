@@ -28,6 +28,7 @@ public class VotingSession
     private String lobbyTimer;
     private List<String> playlist;
     private boolean playlistMode;
+    private boolean allowAbstain;
     private Map<String, String> vetoes; // uid -> "YES" / "NO"
 
     public VotingSession()
@@ -36,6 +37,7 @@ public class VotingSession
         this.levelStatuses = new HashMap<>();
         this.playlist = new ArrayList<>();
         this.playlistMode = false;
+        this.allowAbstain = true;
         this.vetoes = new HashMap<>();
         this.state = SessionState.ACTIVE;
         this.createdAt = Instant.now();

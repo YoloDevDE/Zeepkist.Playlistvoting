@@ -26,6 +26,7 @@ public class User
     private String token;
 
     private String displayName;
+    private String avatarUrl;
 
     @Builder.Default
     private List<UserIdentity> identities = new ArrayList<>();

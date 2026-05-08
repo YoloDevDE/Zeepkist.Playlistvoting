@@ -17,6 +17,7 @@ public class SteamUserPrincipal implements UserDetails
     private final String steamId;
     private final String steamName;
     private final String displayName;
+    private final String avatarUrl;
     private final String token;
     private final Collection<? extends GrantedAuthority> authorities;
 
@@ -27,6 +28,7 @@ public class SteamUserPrincipal implements UserDetails
                 .steamId(user.getSteamId())
                 .steamName(user.getDisplayName())
                 .displayName(user.getDisplayName())
+                .avatarUrl(user.getAvatarUrl())
                 .token(user.getToken())
                 .authorities(user.getRoles().stream()
                         .map(SimpleGrantedAuthority::new)

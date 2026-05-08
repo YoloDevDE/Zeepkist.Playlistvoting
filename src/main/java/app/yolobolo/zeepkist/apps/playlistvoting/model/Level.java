@@ -15,4 +15,5 @@ public class Level
     private String name;
     private String author;
     private Long workshopID;
+    private String thumbnailUrl;
 }

@@ -114,6 +114,36 @@ public class SessionService
         });
     }
 
+    public void updateSessionSettings(String id, app.yolobolo.zeepkist.apps.playlistvoting.model.dto.request.SessionSettingsRequest settings, String hostId)
+    {
+        sessionRepository.findById(id).ifPresent(session ->
+        {
+            if (session.getHostId().equals(hostId))
+            {
+                if (settings.getDisplayName() != null)
+                {
+                    session.setDisplayName(settings.getDisplayName());
+                }
+                if (settings.getPlaylist() != null)
+                {
+                    session.setPlaylist(settings.getPlaylist());
+                }
+                session.setPlaylistMode(settings.isPlaylistMode());
+                session.setAllowAbstain(settings.isAllowAbstain());
+
+                if (settings.getState() != null && settings.getState() != session.getState())
+                {
+                    updateSessionState(id, settings.getState(), hostId);
+                }
+                else
+                {
+                    sessionRepository.save(session);
+                }
+                log.info("Session {} settings updated", id);
+            }
+        });
+    }
+
     public void deleteSession(String id, String hostId)
     {
         sessionRepository.findById(id).ifPresent(session ->

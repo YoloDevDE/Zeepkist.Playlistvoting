@@ -25,6 +25,7 @@ public class GlobalModelAttributes
         model.addAttribute("steamId", principal.getSteamId());
         model.addAttribute("steamName", principal.getSteamName());
         model.addAttribute("displayName", principal.getDisplayName());
+        model.addAttribute("avatarUrl", principal.getAvatarUrl());
         model.addAttribute("token", principal.getToken());
     }
 }

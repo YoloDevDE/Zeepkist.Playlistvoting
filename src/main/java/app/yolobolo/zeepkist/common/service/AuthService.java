@@ -125,10 +125,10 @@ public class AuthService
 
     public User handleSteamLogin(String steamId)
     {
-        String steamName = fetchSteamName(steamId);
+        Map<String, String> steamData = fetchSteamPlayerData(steamId);
         // Steam OpenID 2.0 provides no email by default. 
         // We'll keep it null for now or fetch it if we had a way.
-        return userService.createOrUpdateUserFromIdentity("STEAM", steamId, steamName);
+        return userService.createOrUpdateUserFromIdentity("STEAM", steamId, steamData.get("name"), steamData.get("avatar"));
     }
 
     public User findOrCreateUser(String steamId)
@@ -138,17 +138,26 @@ public class AuthService
         {
             User user = userOpt.get();
             user.setLastLoginAt(Instant.now());
-            userRepo.save(user);
-            return user;
+
+            // Optionally update avatar on every login
+            Map<String, String> steamData = fetchSteamPlayerData(steamId);
+            user.setAvatarUrl(steamData.get("avatar"));
+            user.setDisplayName(steamData.get("name"));
+
+            return userRepo.save(user);
         }
 
-        String steamName = fetchSteamName(steamId);
-        return userService.createOrUpdateUserFromIdentity("STEAM", steamId, steamName);
+        Map<String, String> steamData = fetchSteamPlayerData(steamId);
+        return userService.createOrUpdateUserFromIdentity("STEAM", steamId, steamData.get("name"), steamData.get("avatar"));
     }
 
     @SuppressWarnings("unchecked")
-    private String fetchSteamName(String steamId)
+    private Map<String, String> fetchSteamPlayerData(String steamId)
     {
+        Map<String, String> result = new java.util.HashMap<>();
+        result.put("name", steamId);
+        result.put("avatar", null);
+
         try
         {
             String url = "https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=%s&steamids=%s"
@@ -162,13 +171,15 @@ public class AuthService
             java.util.List<Map<String, Object>> players = (java.util.List<Map<String, Object>>) responseObj.get("players");
             if (players != null && !players.isEmpty())
             {
-                return (String) players.getFirst().get("personaname");
+                Map<String, Object> player = players.getFirst();
+                result.put("name", (String) player.get("personaname"));
+                result.put("avatar", (String) player.get("avatarfull"));
             }
         }
         catch (Exception e)
         {
-            log.warn("Failed to fetch Steam username for steamId: {}", steamId, e);
+            log.warn("Failed to fetch Steam player data for steamId: {}", steamId, e);
         }
-        return steamId;
+        return result;
     }
 }

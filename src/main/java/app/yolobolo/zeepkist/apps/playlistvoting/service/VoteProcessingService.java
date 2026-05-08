@@ -74,19 +74,28 @@ public class VoteProcessingService
         log.info("Vote deleted by ID: {}", voteId);
     }
 
-    public Map<String, Object> calculateVotesMap(List<UserVote> votes)
+    public Map<String, Object> calculateVotesMap(List<UserVote> votes, boolean allowAbstain)
     {
-        VotesResponse response = calculateVotesResponse(votes);
+        VotesResponse response = calculateVotesResponse(votes, allowAbstain);
 
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("yes", response.getYes());
         map.put("no", response.getNo());
-        map.put("abstain", response.getAbstain());
+        if (allowAbstain)
+        {
+            map.put("abstain", response.getAbstain());
+        }
         map.put("total", response.getTotal());
+        map.put("allowAbstain", response.isAllowAbstain());
         return map;
     }
 
     public VotesResponse calculateVotesResponse(List<UserVote> votes)
+    {
+        return calculateVotesResponse(votes, true);
+    }
+
+    public VotesResponse calculateVotesResponse(List<UserVote> votes, boolean allowAbstain)
     {
         if (votes == null)
         {
@@ -95,6 +104,7 @@ public class VoteProcessingService
                     .no(0)
                     .abstain(0)
                     .total(0)
+                    .allowAbstain(allowAbstain)
                     .platforms(Map.of())
                     .build();
         }
@@ -103,13 +113,17 @@ public class VoteProcessingService
         long abstain = votes.stream().filter(v -> v.getVote() == VoteOption.ABSTAIN).count();
 
         Map<String, Long> platforms = votes.stream()
+                .filter(v -> allowAbstain || (v.getVote() != VoteOption.ABSTAIN && v.getVote() != VoteOption.IDK))
                 .collect(Collectors.groupingBy(v -> v.getPlatform().name(), Collectors.counting()));
+
+        long total = allowAbstain ? (yes + no + abstain) : (yes + no);
 
         return VotesResponse.builder()
                 .yes(yes)
                 .no(no)
-                .abstain(abstain)
-                .total(yes + no + abstain)
+                .abstain(allowAbstain ? abstain : 0)
+                .total(total)
+                .allowAbstain(allowAbstain)
                 .platforms(platforms)
                 .build();
     }

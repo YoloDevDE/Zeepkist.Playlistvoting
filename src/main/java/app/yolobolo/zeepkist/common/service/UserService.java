@@ -35,7 +35,7 @@ public class UserService
         return userRepo.findByIdentity(provider, providerId);
     }
 
-    public User createOrUpdateUserFromIdentity(String provider, String providerId, String username)
+    public User createOrUpdateUserFromIdentity(String provider, String providerId, String username, String avatarUrl)
     {
         Optional<User> existingUser = findByIdentity(provider, providerId);
 
@@ -43,6 +43,7 @@ public class UserService
         {
             User user = existingUser.get();
             user.setLastLoginAt(Instant.now());
+            user.setAvatarUrl(avatarUrl);
             // Update username in identity if changed
             user.getIdentities().stream()
                     .filter(i -> provider.equalsIgnoreCase(i.getProvider()))
@@ -60,6 +61,7 @@ public class UserService
 
         User newUser = User.builder()
                 .displayName(username)
+                .avatarUrl(avatarUrl)
                 .token(java.util.UUID.randomUUID().toString().toUpperCase())
                 .identities(new ArrayList<>(List.of(identity)))
                 .roles(new ArrayList<>(List.of("ROLE_USER")))

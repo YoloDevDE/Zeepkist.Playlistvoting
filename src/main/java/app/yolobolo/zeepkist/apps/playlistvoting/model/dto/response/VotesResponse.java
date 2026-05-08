@@ -13,5 +13,15 @@ public class VotesResponse
     private long no;
     private long abstain;
     private long total;
+    private boolean allowAbstain;
     private Map<String, Long> platforms;
+
+    public int getYesPct()
+    {
+        if (total == 0)
+        {
+            return 0;
+        }
+        return (int) Math.round((double) yes / total * 100);
+    }
 }

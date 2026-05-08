@@ -9,8 +9,10 @@
         <div class="px-8 pb-8">
             <div class="relative flex justify-between items-end -mt-12 mb-6">
                 <div class="p-1 bg-brand-dark rounded-2xl">
-                    <div class="w-24 h-24 bg-brand-accent rounded-xl flex items-center justify-center text-4xl font-black text-brand-dark shadow-xl">
-                        <span th:text="${#strings.substring(displayName != null ? displayName : username, 0,1).toUpperCase()}">U</span>
+                    <div class="w-24 h-24 bg-brand-accent rounded-xl flex items-center justify-center text-4xl font-black text-brand-dark shadow-xl overflow-hidden">
+                        <img alt="Profile" class="w-full h-full object-cover" th:if="${avatarUrl}" th:src="${avatarUrl}">
+                        <span th:text="${#strings.substring(displayName != null ? displayName : username, 0,1).toUpperCase()}"
+                              th:unless="${avatarUrl}">U</span>
                     </div>
                 </div>
                 <div class="pb-2">

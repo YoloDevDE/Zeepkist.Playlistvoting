@@ -75,6 +75,18 @@ public class PlaylistVotingRestController
         return ResponseEntity.noContent().build();
     }
 
+    @PutMapping("/sessions/{id}/settings")
+    @Operation(summary = "Update session settings", description = "Updates all session settings (name, playlist, mode, abstain, state) at once.")
+    public ResponseEntity<Void> updateSessionSettings(@PathVariable String id, @RequestBody SessionSettingsRequest request, @AuthenticationPrincipal SteamUserPrincipal principal)
+    {
+        if (principal == null)
+        {
+            return ResponseEntity.status(401).build();
+        }
+        voteService.updateSessionSettings(id, principal.getHostId(), request);
+        return ResponseEntity.noContent().build();
+    }
+
     @DeleteMapping("/sessions/{id}/votes")
     @Operation(summary = "Reset votes for a session", description = "Deletes all votes recorded for a specific session.")
     public ResponseEntity<Void> resetSessionVotes(@PathVariable String id, @AuthenticationPrincipal SteamUserPrincipal principal)
@@ -198,6 +210,21 @@ public class PlaylistVotingRestController
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/sessions/{id}/playlist")
+    @Operation(summary = "Update session playlist", description = "Updates the playlist for a specific session.")
+    public ResponseEntity<Void> updateSessionPlaylist(
+            @PathVariable String id,
+            @RequestBody UpdatePlaylistRequest request,
+            @AuthenticationPrincipal SteamUserPrincipal principal)
+    {
+        if (principal == null)
+        {
+            return ResponseEntity.status(401).build();
+        }
+        voteService.updateSessionPlaylist(id, principal.getHostId(), request);
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/sessions/active/veto")
     @Operation(summary = "Veto a level", description = "Sets the veto status for a specific level in the active session.")
     public ResponseEntity<Void> vetoActiveLevel(
@@ -211,6 +238,36 @@ public class PlaylistVotingRestController
             return ResponseEntity.status(401).build();
         }
         voteService.vetoLevel(effectiveToken, request.getUid(), request.getVeto());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/sessions/{id}/levels/veto")
+    @Operation(summary = "Veto a level in a specific session", description = "Sets the veto status for a specific level in any session owned by the host.")
+    public ResponseEntity<Void> vetoLevel(
+            @PathVariable String id,
+            @RequestBody VetoRequest request,
+            @AuthenticationPrincipal SteamUserPrincipal principal)
+    {
+        if (principal == null)
+        {
+            return ResponseEntity.status(401).build();
+        }
+        voteService.vetoLevel(id, request.getUid(), request.getVeto(), principal.getHostId());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/sessions/{id}/levels/status")
+    @Operation(summary = "Update level status", description = "Updates the status (e.g., VOTING_FINISHED, VOTING_ACTIVE) of a specific level in a session.")
+    public ResponseEntity<Void> updateLevelStatus(
+            @PathVariable String id,
+            @RequestBody LevelStatusRequest request,
+            @AuthenticationPrincipal SteamUserPrincipal principal)
+    {
+        if (principal == null)
+        {
+            return ResponseEntity.status(401).build();
+        }
+        voteService.updateLevelStatus(id, request.getUid(), request.getStatus(), principal.getHostId());
         return ResponseEntity.noContent().build();
     }
 
