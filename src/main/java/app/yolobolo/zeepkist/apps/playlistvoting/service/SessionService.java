@@ -27,6 +27,10 @@ public class SessionService
 
     public List<VotingSession> findByHostId(String hostId)
     {
+        if (hostId == null)
+        {
+            return List.of();
+        }
         return sessionRepository.findByHostId(hostId);
     }
 
@@ -37,6 +41,10 @@ public class SessionService
 
     public VotingSession findActiveOrPausedSession(String hostId)
     {
+        if (hostId == null)
+        {
+            return null;
+        }
         List<VotingSession> sessions = sessionRepository.findByHostId(hostId);
         return sessions.stream()
                 .filter(s -> s.getState() == SessionState.ACTIVE)
@@ -56,7 +64,6 @@ public class SessionService
             if (s.getState() != SessionState.FINISHED)
             {
                 s.setState(SessionState.PAUSED);
-                s.setCurrentLevelUid(null);
                 sessionRepository.save(s);
             }
         }
@@ -98,7 +105,6 @@ public class SessionService
                         if (!s.getId().equals(id) && s.getState() != SessionState.FINISHED)
                         {
                             s.setState(SessionState.PAUSED);
-                            s.setCurrentLevelUid(null);
                             sessionRepository.save(s);
                         }
                     }
@@ -128,8 +134,14 @@ public class SessionService
                 {
                     session.setPlaylist(settings.getPlaylist());
                 }
-                session.setPlaylistMode(settings.isPlaylistMode());
-                session.setAllowAbstain(settings.isAllowAbstain());
+
+                boolean hasPlaylist = (session.getPlaylist() != null && !session.getPlaylist().isEmpty());
+                session.setPlaylistMode(settings.isPlaylistMode() && hasPlaylist);
+                if (settings.getVotingMode() != null)
+                {
+                    session.setVotingMode(settings.getVotingMode());
+                    session.setAllowAbstain(settings.getVotingMode() == app.yolobolo.zeepkist.apps.playlistvoting.model.enums.VotingMode.ABSTAIN_ENABLED);
+                }
 
                 if (settings.getState() != null && settings.getState() != session.getState())
                 {
@@ -154,6 +166,12 @@ public class SessionService
                 log.info("Session {} deleted", id);
             }
         });
+    }
+
+    public void deleteByHostId(String hostId)
+    {
+        sessionRepository.deleteByHostId(hostId);
+        log.info("Deleted all sessions for host: {}", hostId);
     }
 
     public List<VotingSession> findAll()

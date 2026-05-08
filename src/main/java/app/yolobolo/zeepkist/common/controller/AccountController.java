@@ -3,6 +3,7 @@ package app.yolobolo.zeepkist.common.controller;
 import app.yolobolo.zeepkist.apps.playlistvoting.service.VoteService;
 import app.yolobolo.zeepkist.common.model.SteamUserPrincipal;
 import app.yolobolo.zeepkist.common.model.User;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 @Slf4j
@@ -26,17 +28,23 @@ public class AccountController
     private final VoteService voteService;
 
     @GetMapping
-    public String profile(Model model, @AuthenticationPrincipal SteamUserPrincipal principal)
+    public String profile(Model model, @AuthenticationPrincipal SteamUserPrincipal principal, HttpServletRequest request)
     {
         if (principal == null)
         {
             return "redirect:/login";
         }
 
-        User user = voteService.findUserById(principal.getHostId());
+        User user = principal != null ? voteService.findUserById(principal.getHostId()) : null;
+        if (user == null && principal != null)
+        {
+            log.warn("Profile accessed by authenticated user {}, but no user record found in database for hostId {}",
+                    principal.getDisplayName(), principal.getHostId());
+        }
 
-        List<User> managers = user != null && user.getManagerIds() != null
+        List<User> managers = (user != null && user.getManagerIds() != null)
                 ? user.getManagerIds().stream()
+                  .filter(Objects::nonNull)
                   .map(voteService::findUserBySteamId)
                   .filter(Objects::nonNull)
                   .toList()
@@ -44,7 +52,20 @@ public class AccountController
 
         model.addAttribute("host", user);
         model.addAttribute("managers", managers);
-        model.addAttribute("username", principal.getDisplayName());
+        model.addAttribute("username", principal != null ? principal.getDisplayName() : "Unknown");
+
+        String hostId = principal != null ? principal.getHostId() : null;
+        model.addAttribute("sessionCount", hostId != null ? voteService.countSessionsByHostId(hostId) : 0);
+        model.addAttribute("totalVotes", hostId != null ? voteService.countTotalVotesByHostId(hostId) : 0);
+        model.addAttribute("voteStats", hostId != null ? voteService.getVoteStatsByHostId(hostId) : Map.of());
+
+        String baseUrl = request.getScheme() + "://" + request.getServerName();
+        if ((request.getScheme().equals("http") && request.getServerPort() != 80) ||
+                (request.getScheme().equals("https") && request.getServerPort() != 443))
+        {
+            baseUrl += ":" + request.getServerPort();
+        }
+        model.addAttribute("baseUrl", baseUrl);
 
         return "common/profile";
     }
@@ -57,9 +78,13 @@ public class AccountController
             return "redirect:/login";
         }
 
-        String hostId = principal.getHostId();
+        String hostId = principal != null ? principal.getHostId() : null;
+        if (hostId == null)
+        {
+            return "redirect:/login";
+        }
         User user = voteService.findUserById(hostId);
-        if (user != null && !user.getManagerIds().contains(steamId))
+        if (user != null && user.getManagerIds() != null && !user.getManagerIds().contains(steamId))
         {
             user.getManagerIds().add(steamId);
             voteService.saveUser(user);
@@ -76,9 +101,13 @@ public class AccountController
             return "redirect:/login";
         }
 
-        String hostId = principal.getHostId();
+        String hostId = principal != null ? principal.getHostId() : null;
+        if (hostId == null)
+        {
+            return "redirect:/login";
+        }
         User user = voteService.findUserById(hostId);
-        if (user != null)
+        if (user != null && user.getManagerIds() != null)
         {
             user.getManagerIds().remove(steamId);
             voteService.saveUser(user);
@@ -95,7 +124,11 @@ public class AccountController
             return "redirect:/login";
         }
 
-        String hostId = principal.getHostId();
+        String hostId = principal != null ? principal.getHostId() : null;
+        if (hostId == null)
+        {
+            return "redirect:/login";
+        }
         User user = voteService.findUserById(hostId);
         if (user != null)
         {
@@ -104,5 +137,33 @@ public class AccountController
             log.info("Token refreshed for host user {}", hostId);
         }
         return "redirect:/profile";
+    }
+
+    @PostMapping("/delete")
+    public String deleteProfile(@AuthenticationPrincipal SteamUserPrincipal principal, HttpServletRequest request)
+    {
+        if (principal == null)
+        {
+            return "redirect:/login";
+        }
+
+        String hostId = principal != null ? principal.getHostId() : null;
+        if (hostId == null)
+        {
+            return "redirect:/login";
+        }
+        voteService.deleteUser(hostId);
+        log.info("Profile deleted for host user {}", hostId);
+
+        try
+        {
+            request.logout();
+        }
+        catch (Exception e)
+        {
+            log.error("Failed to logout after profile deletion", e);
+        }
+
+        return "redirect:/login?deleted=true";
     }
 }

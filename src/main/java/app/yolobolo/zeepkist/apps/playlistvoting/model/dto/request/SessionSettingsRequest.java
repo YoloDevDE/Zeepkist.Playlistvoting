@@ -1,15 +1,17 @@
 package app.yolobolo.zeepkist.apps.playlistvoting.model.dto.request;
 
-import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.ZeeplistDTO;
+import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.SessionState;
 import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.VotingMode;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
-public class CreateSessionRequest
+public class SessionSettingsRequest
 {
-    private String name;
+    private String displayName;
+    private List<String> playlist;
     private boolean playlistMode;
-    private double roundLength;
+    private SessionState state;
     private VotingMode votingMode;
-    private ZeeplistDTO zeeplist;
 }

@@ -7,13 +7,11 @@ import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.ZeeplistDTO;
 import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.request.CreateSessionRequest;
 import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.request.SessionSettingsRequest;
 import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.request.UpdatePlaylistRequest;
-import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.response.LevelResponse;
-import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.response.PlaylistResponse;
-import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.response.VotesResponse;
-import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.response.VotingResultResponse;
+import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.response.*;
 import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.Platform;
 import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.SessionState;
 import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.VoteOption;
+import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.VotingMode;
 import app.yolobolo.zeepkist.apps.playlistvoting.repository.UserVoteRepository;
 import app.yolobolo.zeepkist.common.model.User;
 import app.yolobolo.zeepkist.common.repository.UserRepository;
@@ -23,6 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -88,6 +87,50 @@ public class VoteService
         log.info("User saved: {}", user.getId());
     }
 
+    public void deleteUser(String userId)
+    {
+        User user = findUserById(userId);
+        if (user == null)
+        {
+            return;
+        }
+
+        // 1. Delete all votes by this user (Steam)
+        String steamId = user.getSteamId();
+        if (steamId != null)
+        {
+            voteRepository.deleteByPlatformAndPlatformUserId(Platform.STEAM, steamId);
+        }
+
+        // 2. Delete all sessions hosted by this user
+        List<VotingSession> sessions = sessionService.findByHostId(userId);
+        for (VotingSession session : sessions)
+        {
+            // Delete votes for each session
+            voteRepository.deleteBySessionId(session.getId());
+        }
+        sessionService.deleteByHostId(userId);
+
+        // 3. Delete the user itself
+        userRepo.deleteById(userId);
+
+        // 4. Remove this user as a manager from others
+        if (steamId != null)
+        {
+            List<User> managedByThisUser = userRepo.findByManagerIdsContaining(steamId);
+            for (User hostUser : managedByThisUser)
+            {
+                if (hostUser.getManagerIds() != null)
+                {
+                    hostUser.getManagerIds().remove(steamId);
+                    userRepo.save(hostUser);
+                }
+            }
+        }
+
+        log.info("User {} and all relations deleted", userId);
+    }
+
     // --- Session ---
 
     public VotingSession findActiveSession(String token)
@@ -113,7 +156,11 @@ public class VoteService
         if (session != null)
         {
             session.setPlaylistMode(request.isPlaylistMode());
-            session.setAllowAbstain(request.isAllowAbstain());
+            if (request.getVotingMode() != null)
+            {
+                session.setVotingMode(request.getVotingMode());
+                session.setAllowAbstain(request.getVotingMode() == app.yolobolo.zeepkist.apps.playlistvoting.model.enums.VotingMode.ABSTAIN_ENABLED);
+            }
             if (request.getZeeplist() != null)
             {
                 applyZeeplistToSession(session, request.getZeeplist());
@@ -331,11 +378,21 @@ public class VoteService
         else
         {
             VoteOption actualOption = (option == VoteOption.IDK) ? (new Random().nextBoolean() ? VoteOption.YES : VoteOption.NO) : option;
-            if (actualOption == VoteOption.ABSTAIN && !session.isAllowAbstain())
+            boolean canAbstain = session.getVotingMode() == VotingMode.ABSTAIN_ENABLED || session.isAllowAbstain();
+            if (actualOption == VoteOption.ABSTAIN && !canAbstain)
             {
                 return "Abstain votes are disabled for this session | " + getVoteSummary(session);
             }
-            result = voteProcessingService.castVote(session.getId(), session.getCurrentLevelUid(), platformUserId, platformUsername, platform, actualOption);
+
+            Optional<UserVote> existing = voteProcessingService.getVote(session.getId(), session.getCurrentLevelUid(), platformUserId, platform);
+            if (existing.isPresent() && existing.get().getVote() == actualOption)
+            {
+                result = voteProcessingService.removeVote(session.getId(), session.getCurrentLevelUid(), platformUserId, platform);
+            }
+            else
+            {
+                result = voteProcessingService.castVote(session.getId(), session.getCurrentLevelUid(), platformUserId, platformUsername, platform, actualOption);
+            }
         }
 
         sessionService.save(session);
@@ -367,7 +424,8 @@ public class VoteService
         Level level = session.getCurrentLevelUid() != null ? levelService.findById(session.getCurrentLevelUid()).orElse(null) : null;
         List<UserVote> votes = session.getCurrentLevelUid() != null ? voteProcessingService.getVotes(session.getId(), session.getCurrentLevelUid()) : List.of();
 
-        VotesResponse votesResponse = voteProcessingService.calculateVotesResponse(votes, session.isAllowAbstain());
+        boolean canAbstain = session.getVotingMode() == VotingMode.ABSTAIN_ENABLED || session.isAllowAbstain();
+        VotesResponse votesResponse = voteProcessingService.calculateVotesResponse(votes, canAbstain);
 
         return VotingResultResponse.builder()
                 .sessionName(session.getDisplayName())
@@ -388,8 +446,9 @@ public class VoteService
     private String getVoteSummary(VotingSession session)
     {
         List<UserVote> votes = voteProcessingService.getVotes(session.getId(), session.getCurrentLevelUid());
-        VotesResponse votesResponse = voteProcessingService.calculateVotesResponse(votes, session.isAllowAbstain());
-        if (session.isAllowAbstain())
+        boolean canAbstain = session.getVotingMode() == VotingMode.ABSTAIN_ENABLED || session.isAllowAbstain();
+        VotesResponse votesResponse = voteProcessingService.calculateVotesResponse(votes, canAbstain);
+        if (canAbstain)
         {
             return "%d/%d/%d (y/n/a)".formatted(votesResponse.getYes(), votesResponse.getNo(), votesResponse.getAbstain());
         }
@@ -476,21 +535,34 @@ public class VoteService
         Map<String, Object> data = new LinkedHashMap<>();
 
         VotingSession activeSession = null;
-        if (token != null)
-        {
-            activeSession = findActiveSession(token);
-        }
-        else if (hostId != null)
+        if (hostId != null)
         {
             activeSession = sessionService.findActiveOrPausedSession(hostId);
+        }
+        else if (token != null)
+        {
+            activeSession = findActiveSession(token);
         }
 
         if (activeSession != null)
         {
             data.put("activeSessionName", activeSession.getDisplayName());
             data.put("lobbyTimer", activeSession.getLobbyTimer());
+            data.put("isConnected", activeSession.getLastUsed() != null &&
+                    activeSession.getLastUsed().isAfter(Instant.now().minusSeconds(30)));
             data.put("playlistMode", activeSession.isPlaylistMode());
             data.put("playlist", activeSession.getPlaylist());
+
+            if (token != null)
+            {
+                User viewer = findUserByToken(token);
+                if (viewer != null && viewer.getSteamId() != null && activeSession.getCurrentLevelUid() != null)
+                {
+                    Optional<UserVote> viewerVote = voteProcessingService.getVote(activeSession.getId(), activeSession.getCurrentLevelUid(), viewer.getSteamId(), Platform.STEAM);
+                    data.put("currentVote", viewerVote.map(v -> v.getVote().name()).orElse(null));
+                }
+            }
+
             if (activeSession.getCurrentLevelUid() != null)
             {
                 Level currentLevel = levelService.findById(activeSession.getCurrentLevelUid()).orElse(null);
@@ -500,7 +572,7 @@ public class VoteService
                     lvl.put("name", currentLevel.getName());
                     lvl.put("author", currentLevel.getAuthor());
                     lvl.put("uid", currentLevel.getUid());
-                    lvl.put("workshopID", currentLevel.getWorkshopID());
+                    lvl.put("workshopID", currentLevel.getWorkshopID() != null ? currentLevel.getWorkshopID() : 0L);
                     lvl.put("thumbnailUrl", currentLevel.getThumbnailUrl());
                     data.put("currentLevel", lvl);
                 }
@@ -540,15 +612,45 @@ public class VoteService
             Map<String, Object> sm = new LinkedHashMap<>();
             sm.put("id", s.getId());
             sm.put("name", s.getDisplayName());
-            sm.put("state", s.getState().name());
+            sm.put("displayName", s.getDisplayName());
+            sm.put("state", s.getState() != null ? s.getState().name() : "ACTIVE");
             sm.put("lobbyTimer", s.getLobbyTimer());
+            sm.put("playlistMode", s.isPlaylistMode());
+            sm.put("votingMode", s.getVotingMode() != null ? s.getVotingMode().name() : "NORMAL");
+            sm.put("allowAbstain", s.isAllowAbstain());
+            sm.put("playlist", s.getPlaylist() != null ? s.getPlaylist() : List.of());
+            sm.put("playedLevels", s.getPlayedLevels() != null ? s.getPlayedLevels() : List.of());
+            sm.put("levelStatuses", s.getLevelStatuses() != null ? s.getLevelStatuses() : Map.of());
+            sm.put("vetoes", s.getVetoes() != null ? s.getVetoes() : Map.of());
             sm.put("createdAt", s.getCreatedAt() != null ? s.getCreatedAt().toEpochMilli() : null);
 
-            List<String> playedLevels = s.getPlayedLevels() != null ? s.getPlayedLevels() : List.of();
-            var levelsList = new ArrayList<>(playedLevels);
-            Collections.reverse(levelsList);
+            if (s.getCurrentLevelUid() != null)
+            {
+                levelService.findById(s.getCurrentLevelUid()).ifPresent(levelInfo ->
+                {
+                    Map<String, Object> clm = new LinkedHashMap<>();
+                    clm.put("uid", levelInfo.getUid());
+                    clm.put("name", levelInfo.getName());
+                    clm.put("author", levelInfo.getAuthor());
+                    clm.put("workshopID", levelInfo.getWorkshopID() != null ? levelInfo.getWorkshopID() : 0L);
+                    clm.put("thumbnailUrl", levelInfo.getThumbnailUrl());
+                    sm.put("currentLevel", clm);
+                });
+            }
 
-            var levels = levelsList.stream().map(uid ->
+            List<String> playlistUids = s.getPlaylist() != null ? s.getPlaylist() : List.of();
+            List<String> playedUids = s.getPlayedLevels() != null ? s.getPlayedLevels() : List.of();
+
+            // All levels associated with this session
+            Set<String> allUids = new LinkedHashSet<>();
+            if (s.getCurrentLevelUid() != null)
+            {
+                allUids.add(s.getCurrentLevelUid());
+            }
+            allUids.addAll(playlistUids);
+            allUids.addAll(playedUids);
+
+            var levels = allUids.stream().map(uid ->
             {
                 Level levelInfo = levelService.findById(uid).orElse(null);
                 var lvlVotes = voteProcessingService.getVotes(s.getId(), uid);
@@ -557,10 +659,10 @@ public class VoteService
                 lm.put("uid", uid);
                 lm.put("name", levelInfo != null ? levelInfo.getName() : uid);
                 lm.put("author", levelInfo != null ? levelInfo.getAuthor() : "");
-                lm.put("workshopID", levelInfo != null ? levelInfo.getWorkshopID() : 0);
+                lm.put("workshopID", (levelInfo != null && levelInfo.getWorkshopID() != null) ? levelInfo.getWorkshopID() : 0L);
                 lm.put("thumbnailUrl", levelInfo != null ? levelInfo.getThumbnailUrl() : null);
                 lm.put("isCurrent", uid.equals(s.getCurrentLevelUid()));
-                lm.put("status", s.getLevelStatuses().getOrDefault(uid, "VOTING_ACTIVE"));
+                lm.put("status", s.getLevelStatuses() != null ? s.getLevelStatuses().getOrDefault(uid, "VOTING_ACTIVE") : "VOTING_ACTIVE");
                 lm.put("veto", s.getVetoes() != null ? s.getVetoes().get(uid) : null);
 
                 var individualVotes = lvlVotes.stream()
@@ -622,8 +724,17 @@ public class VoteService
     private Map<String, Object> getVotesMap(List<UserVote> votes, boolean allowAbstain)
     {
         Map<String, Object> map = voteProcessingService.calculateVotesMap(votes, allowAbstain);
-        long yes = (Long) map.get("yes");
-        long no = (Long) map.get("no");
+        if (map == null)
+        {
+            // Defensive for mocks or unexpected service failures
+            map = new LinkedHashMap<>();
+            map.put("yes", 0L);
+            map.put("no", 0L);
+            map.put("total", 0L);
+            map.put("allowAbstain", allowAbstain);
+        }
+        long yes = map.get("yes") != null ? ((Number) map.get("yes")).longValue() : 0L;
+        long no = map.get("no") != null ? ((Number) map.get("no")).longValue() : 0L;
         double yesPct = (yes + no) > 0 ? (yes * 100.0 / (yes + no)) : 0;
         map.put("yesPct", Math.round(yesPct));
         return map;
@@ -632,6 +743,100 @@ public class VoteService
     public List<VotingSession> findAllSessions(String hostId)
     {
         return sessionService.findByHostId(hostId);
+    }
+
+    public long countSessionsByHostId(String hostId)
+    {
+        return sessionService.findByHostId(hostId).size();
+    }
+
+    public long countTotalVotesByHostId(String hostId)
+    {
+        List<VotingSession> sessions = sessionService.findByHostId(hostId);
+        long totalVotes = 0;
+        for (VotingSession session : sessions)
+        {
+            totalVotes += voteRepository.countBySessionId(session.getId());
+        }
+        return totalVotes;
+    }
+
+    public Map<VoteOption, Long> getVoteStatsByHostId(String hostId)
+    {
+        List<VotingSession> sessions = sessionService.findByHostId(hostId);
+        Map<VoteOption, Long> stats = new EnumMap<>(VoteOption.class);
+        for (VoteOption option : VoteOption.values())
+        {
+            stats.put(option, 0L);
+        }
+
+        for (VotingSession session : sessions)
+        {
+            for (VoteOption option : VoteOption.values())
+            {
+                stats.put(option, stats.get(option) + voteRepository.countBySessionIdAndVote(session.getId(), option));
+            }
+        }
+        return stats;
+    }
+
+    public List<VoteDetailResponse> getVoteDetails(String hostId, VoteOption option)
+    {
+        List<VotingSession> sessions = sessionService.findByHostId(hostId);
+        List<String> sessionIds = sessions.stream().map(VotingSession::getId).toList();
+
+        List<UserVote> votesWithOption = voteRepository.findBySessionIdInAndVote(sessionIds, option);
+        List<String> levelUids = votesWithOption.stream()
+                .map(UserVote::getLevelUid)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        List<UserVote> allVotesForLevels = voteRepository.findBySessionIdInAndLevelUidIn(sessionIds, levelUids);
+
+        Map<String, List<UserVote>> groupedAllVotes = allVotesForLevels.stream()
+                .collect(Collectors.groupingBy(UserVote::getLevelUid));
+
+        return levelUids.stream()
+                .map(uid ->
+                {
+                    Level level = levelService.findById(uid).orElse(null);
+                    List<UserVote> levelVotes = groupedAllVotes.getOrDefault(uid, List.of());
+
+                    Map<VoteOption, Long> counts = new EnumMap<>(VoteOption.class);
+                    for (VoteOption vo : VoteOption.values())
+                    {
+                        counts.put(vo, 0L);
+                    }
+                    levelVotes.forEach(v -> counts.put(v.getVote(), counts.get(v.getVote()) + 1));
+
+                    Instant lastVoted = levelVotes.stream()
+                            .map(UserVote::getCreatedAt)
+                            .max(Comparator.naturalOrder())
+                            .orElse(Instant.now());
+
+                    List<VoteDetailResponse.IndividualVoteDTO> individual = levelVotes.stream()
+                            .sorted(Comparator.comparing(UserVote::getCreatedAt).reversed())
+                            .limit(50)
+                            .map(v -> VoteDetailResponse.IndividualVoteDTO.builder()
+                                    .username(v.getPlatformUsername())
+                                    .vote(v.getVote())
+                                    .date(v.getCreatedAt())
+                                    .build())
+                            .toList();
+
+                    return VoteDetailResponse.builder()
+                            .levelUid(uid)
+                            .levelName(level != null ? level.getName() : "Unknown")
+                            .levelAuthor(level != null ? level.getAuthor() : "Unknown")
+                            .workshopID(level != null && level.getWorkshopID() != null ? String.valueOf(level.getWorkshopID()) : null)
+                            .lastVotedAt(lastVoted)
+                            .voteCounts(counts)
+                            .individualVotes(individual)
+                            .build();
+                })
+                .sorted(Comparator.comparing(VoteDetailResponse::getLastVotedAt).reversed())
+                .toList();
     }
 
     public byte[] downloadPlaylist(String id, double roundLength, boolean shuffle, String name, String hostId, String type)
@@ -810,7 +1015,11 @@ public class VoteService
                     session.setPlaylist(request.getPlaylist());
                 }
                 session.setPlaylistMode(request.isPlaylistMode());
-                session.setAllowAbstain(request.isAllowAbstain());
+                if (request.getVotingMode() != null)
+                {
+                    session.setVotingMode(request.getVotingMode());
+                    session.setAllowAbstain(request.getVotingMode() == app.yolobolo.zeepkist.apps.playlistvoting.model.enums.VotingMode.ABSTAIN_ENABLED);
+                }
 
                 if (request.getState() != null && request.getState() != session.getState())
                 {

@@ -15,4 +15,6 @@ public interface VotingSessionRepository extends MongoRepository<VotingSession, 
     List<VotingSession> findByHostIdAndState(String hostId, SessionState state);
 
     List<VotingSession> findByState(SessionState state);
+
+    void deleteByHostId(String hostId);
 }

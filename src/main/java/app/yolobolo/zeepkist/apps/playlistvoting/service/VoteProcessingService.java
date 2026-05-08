@@ -29,6 +29,11 @@ public class VoteProcessingService
         return voteRepository.findBySessionIdAndLevelUid(sessionId, levelUid);
     }
 
+    public Optional<UserVote> getVote(String sessionId, String levelUid, String platformUserId, Platform platform)
+    {
+        return voteRepository.findBySessionIdAndLevelUidAndPlatformAndPlatformUserId(sessionId, levelUid, platform, platformUserId);
+    }
+
     public String castVote(String sessionId, String levelUid, String platformUserId, String platformUsername, Platform platform, VoteOption option)
     {
         Optional<UserVote> existing = voteRepository.findBySessionIdAndLevelUidAndPlatformAndPlatformUserId(

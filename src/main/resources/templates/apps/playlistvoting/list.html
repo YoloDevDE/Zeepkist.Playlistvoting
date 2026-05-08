@@ -66,10 +66,13 @@
             <div class="space-y-3 mb-6 relative z-10">
                 <div class="flex items-center gap-2 text-sm" th:if="${host.activeSession != null}">
                     <span class="relative flex h-2 w-2">
-                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                        <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"
+                              th:if="${host.activeSession.connected}"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2"
+                              th:classappend="${host.activeSession.connected ? 'bg-green-500' : 'bg-slate-500'}"></span>
                     </span>
-                    <span class="text-slate-300 font-medium" th:text="${host.activeSession.displayName}">Active Session Name</span>
+                    <span class="font-medium" th:classappend="${host.activeSession.connected ? 'text-slate-300' : 'text-slate-500'}"
+                          th:text="${host.activeSession.displayName}">Active Session Name</span>
                 </div>
                 <div class="flex items-center gap-2 text-sm text-slate-600" th:unless="${host.activeSession != null}">
                     <span class="h-2 w-2 rounded-full bg-slate-800"></span>

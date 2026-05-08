@@ -4,6 +4,10 @@
 <body th:replace="~{layout/main-layout :: layout('Login', ~{:: .content-slot}, _)}">
 
 <div class="content-slot w-full max-w-md mx-auto">
+    <div class="mb-6 p-4 bg-green-500/10 border border-green-500/20 rounded-xl text-green-400 text-sm text-center" th:if="${param.deleted}">
+        Your account and all associated data have been successfully deleted.
+    </div>
+
     <div class="bg-brand-card border border-slate-800 rounded-3xl p-10 shadow-2xl relative overflow-hidden">
         <!-- Glow effect -->
         <div class="absolute -top-24 -right-24 w-48 h-48 bg-brand-accent/10 blur-3xl rounded-full"></div>

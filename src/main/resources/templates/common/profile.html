@@ -20,46 +20,91 @@
                 </div>
             </div>
 
-            <h1 class="text-3xl font-bold mb-1" th:text="${displayName != null ? displayName : username}">Username</h1>
-            <p class="text-brand-muted text-sm mb-8" th:text="${username}">user@example.com</p>
+            <h1 class="text-3xl font-bold mb-8" th:text="${host?.displayName ?: (displayName ?: username)}">Username</h1>
+
+            <!-- Quick Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                <div class="bg-slate-900/50 border border-slate-800 p-4 rounded-xl text-center">
+                    <p class="text-slate-500 text-xs font-bold uppercase tracking-widest mb-1">Sessions</p>
+                    <p class="text-2xl font-black text-brand-accent" th:text="${sessionCount}">0</p>
+                </div>
+                <div class="bg-slate-900/50 border border-slate-800 p-4 rounded-xl text-center">
+                    <p class="text-slate-500 text-xs font-bold uppercase tracking-widest mb-1">Total Votes</p>
+                    <p class="text-2xl font-black text-brand-accent" th:text="${totalVotes}">0</p>
+                    <div class="grid grid-cols-5 gap-2 mt-4 pt-4 border-t border-slate-800/50">
+                        <div class="cursor-pointer hover:bg-slate-800/50 p-1 rounded transition-colors"
+                             onclick="showVoteDetails(this.getAttribute('data-option'))"
+                             th:data-option="${opt}"
+                             th:each="opt : ${T(app.yolobolo.zeepkist.apps.playlistvoting.model.enums.VoteOption).values()}">
+                            <p class="text-[10px] text-slate-500 font-bold" th:text="${opt}">YES</p>
+                            <p class="text-xs font-black"
+                               th:classappend="${opt.name() == 'YES' ? 'text-green-400' :
+                                                (opt.name() == 'NO' ? 'text-red-400' :
+                                                (opt.name() == 'ABSTAIN' ? 'text-slate-400' :
+                                                (opt.name() == 'REMOVE' ? 'text-orange-400' :
+                                                (opt.name() == 'IDK' ? 'text-purple-400' : 'text-brand-accent'))))}"
+                               th:text="${voteStats != null ? voteStats.get(opt) : 0}">0</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="p-6 bg-slate-900/50 rounded-xl border border-slate-800">
                     <h3 class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-4">Account Details</h3>
-                    <div class="space-y-3">
-                        <div class="flex justify-between text-sm">
-                            <span class="text-slate-500">Username</span>
-                            <span class="font-mono text-brand-accent" th:text="${username}">yolo@example.com</span>
+                    <div class="space-y-3" th:if="${host != null}">
+                        <div class="flex justify-between text-sm" th:if="${host.createdAt != null}">
+                            <span class="text-slate-500">Member Since</span>
+                            <span class="text-brand-accent" th:text="${#temporals.format(host.createdAt, 'dd.MM.yyyy')}">01.01.2024</span>
                         </div>
-                        <div class="flex justify-between text-sm">
-                            <span class="text-slate-500">Steam Linked</span>
-                            <span class="text-green-400 font-bold" th:if="${steamId != null}" th:text="${steamName}">Linked</span>
-                            <span class="text-red-400" th:unless="${steamId != null}">Not Linked</span>
-                        </div>
-                        <div class="flex justify-between text-sm" th:if="${token != null}">
+                        <div class="flex justify-between text-sm" th:if="${host.token != null}">
                             <span class="text-slate-500">Host Token</span>
-                            <span class="font-mono text-brand-accent" th:text="${token}">ABC-123</span>
+                            <div class="flex items-center gap-2">
+                                <span class="font-mono text-brand-accent blur-md select-none transition-all duration-300"
+                                      id="token-span"
+                                      th:text="${host.token}">ABC-123</span>
+                                <button class="text-slate-500 hover:text-brand-accent transition-colors"
+                                        onclick="toggleToken()"
+                                        title="Toggle Token Visibility"
+                                        type="button">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round"
+                                              stroke-linejoin="round" stroke-width="2"/>
+                                        <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                              stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
+                        <div class="pt-4 mt-4 border-t border-slate-800">
+                            <h3 class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-4">Token Management</h3>
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm text-slate-500">Refresh Token</span>
+                                <form method="post" th:action="@{/profile/token/refresh}">
+                                    <button class="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1 rounded border border-slate-700 transition-all"
+                                            type="submit">
+                                        Refresh
+                                    </button>
+                                </form>
+                            </div>
+                            <p class="text-[10px] text-slate-600 mt-2">Refreshing your token will break existing bot integrations until
+                                updated.</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-col items-center justify-center h-full text-center py-8"
+                         th:unless="${host != null}">
+                        <p class="text-sm text-brand-muted">Account record not found in database.</p>
                     </div>
                 </div>
 
                 <div class="p-6 bg-slate-900/50 rounded-xl border border-slate-800">
-                    <h3 class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-4">Host Management</h3>
+                    <h3 class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-4">Host Managers</h3>
                     <div class="space-y-4" th:if="${host != null}">
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm text-slate-500">Refresh Token</span>
-                            <form method="post" th:action="@{/profile/token/refresh}">
-                                <button class="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1 rounded border border-slate-700 transition-all"
-                                        type="submit">
-                                    Refresh
-                                </button>
-                            </form>
-                        </div>
                         <div class="space-y-2" th:if="${not #lists.isEmpty(managers)}">
-                            <p class="text-xs font-bold text-slate-500 uppercase tracking-widest">Managers</p>
+                            <p class="text-xs font-bold text-slate-500 uppercase tracking-widest">Current Managers</p>
                             <div class="flex items-center justify-between bg-brand-dark/50 p-2 rounded border border-slate-800"
                                  th:each="m : ${managers}">
-                                <span class="text-xs" th:text="${m.steamName}">Manager Name</span>
+                                <span class="text-xs" th:text="${m.displayName}">Manager Name</span>
                                 <form method="post" th:action="@{/profile/manager/remove}">
                                     <input name="steamId" th:value="${m.steamId}" type="hidden">
                                     <button class="text-red-400 hover:text-red-300" type="submit">
@@ -71,6 +116,7 @@
                                 </form>
                             </div>
                         </div>
+                        <p class="text-xs font-bold text-slate-500 uppercase tracking-widest mt-4">Add Manager</p>
                         <form class="flex gap-2" method="post" th:action="@{/profile/manager/add}">
                             <label class="sr-only" for="managerSteamId">Manager SteamID64</label>
                             <input class="flex-grow bg-brand-dark border border-slate-700 rounded px-2 py-1 text-xs focus:outline-none focus:border-brand-accent"
@@ -79,17 +125,68 @@
                                    type="text">
                             <button class="bg-brand-accent text-brand-dark px-3 py-1 rounded text-xs font-bold hover:bg-brand-accent/80 transition-all"
                                     type="submit">
-                                Add Manager
+                                Add
                             </button>
                         </form>
                     </div>
                     <div class="flex flex-col items-center justify-center h-full text-center"
                          th:unless="${host != null}">
-                        <p class="text-sm text-brand-muted mb-4">No host profile found. Link Steam to manage
-                            sessions.</p>
-                        <a class="bg-brand-accent text-brand-dark px-4 py-2 rounded-lg text-sm font-bold hover:bg-brand-accent/80 transition-all"
-                           href="/auth/steam">Link
-                            Steam</a>
+                        <p class="text-sm text-brand-muted mb-4">No host profile found.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-12 pt-8 border-t border-slate-800" th:if="${host != null and host.token != null}">
+                <h3 class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-4">Twitch Chat Commands</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <!-- Nightbot -->
+                    <div class="bg-slate-900/30 border border-slate-800 p-4 rounded-xl">
+                        <p class="text-brand-accent font-bold text-sm mb-3">Nightbot</p>
+                        <div class="space-y-3">
+                            <div th:each="opt : ${T(app.yolobolo.zeepkist.apps.playlistvoting.model.enums.VoteOption).values()}">
+                                <p class="text-[9px] text-slate-500 mb-1" th:text="'!' + ${opt.name().toLowerCase()}"></p>
+                                <div class="relative group">
+                                    <input class="w-full bg-brand-dark border border-slate-700 rounded px-2 py-1 text-[8px] font-mono text-slate-400 focus:outline-none focus:border-brand-accent"
+                                           onclick="this.select()"
+                                           readonly
+                                           th:value="'!addcom !' + ${opt.name().toLowerCase()} + ' $(urlfetch ' + ${baseUrl} + '/api/playlistvoting/votes?token=' + ${host.token} + '&platformUserId=$(userid)&username=$(user)&platform=TWITCH&vote=' + ${opt.name()} + ')'">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- StreamElements -->
+                    <div class="bg-slate-900/30 border border-slate-800 p-4 rounded-xl">
+                        <p class="text-brand-accent font-bold text-sm mb-3">StreamElements</p>
+                        <div class="space-y-3">
+                            <div th:each="opt : ${T(app.yolobolo.zeepkist.apps.playlistvoting.model.enums.VoteOption).values()}">
+                                <p class="text-[9px] text-slate-500 mb-1" th:text="'!' + ${opt.name().toLowerCase()}"></p>
+                                <div class="relative group">
+                                    <input class="w-full bg-brand-dark border border-slate-700 rounded px-2 py-1 text-[8px] font-mono text-slate-400 focus:outline-none focus:border-brand-accent"
+                                           onclick="this.select()"
+                                           readonly
+                                           th:value="'!command add ' + ${opt.name().toLowerCase()} + ' ${urlfetch ' + ${baseUrl} + '/api/playlistvoting/votes?token=' + ${host.token} + '&platformUserId=${user.id}&username=${user.name}&platform=TWITCH&vote=' + ${opt.name()} + '}'">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Streamer.bot -->
+                    <div class="bg-slate-900/30 border border-slate-800 p-4 rounded-xl">
+                        <p class="text-brand-accent font-bold text-sm mb-3">Streamer.bot</p>
+                        <div class="space-y-3">
+                            <div th:each="opt : ${T(app.yolobolo.zeepkist.apps.playlistvoting.model.enums.VoteOption).values()}">
+                                <p class="text-[9px] text-slate-500 mb-1" th:text="'!' + ${opt.name().toLowerCase()} + ' URL'"></p>
+                                <div class="relative group">
+                                    <input class="w-full bg-brand-dark border border-slate-700 rounded px-2 py-1 text-[8px] font-mono text-slate-400 focus:outline-none focus:border-brand-accent"
+                                           onclick="this.select()"
+                                           readonly
+                                           th:value="${baseUrl} + '/api/playlistvoting/votes?token=' + ${host.token} + '&platformUserId=%userId%&username=%user%&platform=TWITCH&vote=' + ${opt.name()}">
+                                </div>
+                            </div>
+                            <p class="text-[9px] text-slate-500 mt-2 italic">Use "Fetch URL" sub-action with the above URLs. Map %userId%
+                                and %user% accordingly.</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -101,8 +198,143 @@
                     To Dashboard
                 </a>
             </div>
+
+            <div class="mt-12 pt-8 border-t border-slate-800">
+                <h3 class="text-red-500 text-xs font-bold uppercase tracking-widest mb-4">Danger Zone</h3>
+                <div class="p-6 bg-red-500/5 rounded-xl border border-red-500/20 flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div>
+                        <h4 class="text-red-400 font-bold mb-1">Delete Account</h4>
+                        <p class="text-xs text-slate-500">This will permanently delete your account, all your sessions
+                            and votes. This action cannot be undone.</p>
+                    </div>
+                    <form method="post"
+                          onsubmit="return confirm('Are you sure you want to delete your profile? This will delete all your sessions and votes forever.');"
+                          th:action="@{/profile/delete}">
+                        <button class="px-6 py-2 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white rounded-lg border border-red-600/30 transition-all text-sm font-bold"
+                                type="submit">
+                            Delete Profile
+                        </button>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
+
+    <!-- Details Modal -->
+    <div class="fixed inset-0 z-50 hidden" id="voteDetailsModal">
+        <div class="absolute inset-0 bg-brand-dark/80 backdrop-blur-sm" onclick="closeModal()"></div>
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl max-h-[80vh] overflow-hidden bg-brand-card border border-slate-800 rounded-2xl shadow-2xl flex flex-col">
+            <div class="p-6 border-b border-slate-800 flex justify-between items-center">
+                <h3 class="text-xl font-bold" id="modalTitle">Vote Details</h3>
+                <button class="text-slate-400 hover:text-white" onclick="closeModal()">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path d="M6 18L18 6M6 6l12 12" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto flex-grow" id="modalContent">
+                <div class="flex items-center justify-center py-12">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-accent"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleToken() {
+            const span = document.getElementById('token-span');
+            if (span.classList.contains('blur-md')) {
+                span.classList.remove('blur-md', 'select-none');
+            } else {
+                span.classList.add('blur-md', 'select-none');
+            }
+        }
+
+        function showVoteDetails(option) {
+            $('#modalTitle').text('Details for ' + option + ' Votes');
+            $('#voteDetailsModal').removeClass('hidden');
+            $('#modalContent').html(`
+                <div class="flex items-center justify-center py-12">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-accent"></div>
+                </div>
+            `);
+
+            $.get('/api/playlistvoting/vote-details', {option: option}, function (data) {
+                if (!data || data.length === 0) {
+                    $('#modalContent').html('<p class="text-center text-slate-500 py-12">No votes found for this option.</p>');
+                    return;
+                }
+
+                let html = '<div class="space-y-6">';
+                data.forEach(item => {
+                    html += `
+                        <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-4">
+                            <div class="flex justify-between items-start mb-4">
+                                <div>
+                                    <h4 class="font-bold text-brand-accent">${item.levelName || 'Unknown Level'}</h4>
+                                    <p class="text-xs text-slate-500">by ${item.levelAuthor || 'Unknown'}</p>
+                                    ${item.workshopID ? `<a href="https://steamcommunity.com/sharedfiles/filedetails/?id=${item.workshopID}" target="_blank" class="text-[10px] text-steam-accent hover:underline">Workshop Link</a>` : ''}
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-[10px] text-slate-500 uppercase font-bold">Last Voted</p>
+                                    <p class="text-xs text-brand-muted">${new Date(item.lastVotedAt).toLocaleString()}</p>
+                                </div>
+                            </div>
+                            
+                            <div class="grid grid-cols-5 gap-2 mb-4 p-2 bg-brand-dark/50 rounded-lg">
+                                ${Object.entries(item.voteCounts).map(([opt, count]) => `
+                                    <div class="text-center">
+                                        <p class="text-[8px] text-slate-600 font-bold">${opt}</p>
+                                        <p class="text-xs font-black ${getVoteColorClass(opt)}">${count}</p>
+                                    </div>
+                                `).join('')}
+                            </div>
+
+                            <div class="space-y-1">
+                                <p class="text-[10px] text-slate-500 uppercase font-bold mb-2">Recent Voters</p>
+                                <div class="max-h-32 overflow-y-auto pr-2 space-y-1">
+                                    ${item.individualVotes.map(v => `
+                                        <div class="flex justify-between items-center text-[10px] py-1 border-b border-slate-800/50 last:border-0">
+                                            <span class="font-bold text-slate-300">${v.username}</span>
+                                            <div class="flex gap-3 items-center">
+                                                <span class="${getVoteColorClass(v.vote)} font-black uppercase">${v.vote}</span>
+                                                <span class="text-slate-600">${new Date(v.date).toLocaleDateString()}</span>
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                $('#modalContent').html(html);
+            }).fail(function () {
+                $('#modalContent').html('<p class="text-center text-red-400 py-12">Failed to load vote details.</p>');
+            });
+        }
+
+        function getVoteColorClass(opt) {
+            switch (opt) {
+                case 'YES':
+                    return 'text-green-400';
+                case 'NO':
+                    return 'text-red-400';
+                case 'ABSTAIN':
+                    return 'text-slate-400';
+                case 'REMOVE':
+                    return 'text-orange-400';
+                case 'IDK':
+                    return 'text-purple-400';
+                default:
+                    return 'text-brand-accent';
+            }
+        }
+
+        function closeModal() {
+            $('#voteDetailsModal').addClass('hidden');
+        }
+    </script>
 </div>
 
 </body>

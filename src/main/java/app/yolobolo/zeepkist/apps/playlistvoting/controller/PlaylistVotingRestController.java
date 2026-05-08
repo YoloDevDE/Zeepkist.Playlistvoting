@@ -4,6 +4,7 @@ import app.yolobolo.zeepkist.apps.playlistvoting.model.Level;
 import app.yolobolo.zeepkist.apps.playlistvoting.model.VotingSession;
 import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.request.*;
 import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.response.PlaylistResponse;
+import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.response.VoteDetailResponse;
 import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.response.VotingResultResponse;
 import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.Platform;
 import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.VoteOption;
@@ -21,6 +22,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -383,6 +385,17 @@ public class PlaylistVotingRestController
             return ResponseEntity.badRequest().build();
         }
         return ResponseEntity.ok(playlist);
+    }
+
+    @GetMapping("/vote-details")
+    @Operation(summary = "Get detailed vote statistics", description = "Returns levels and voters for a specific vote option across all host's sessions.")
+    public ResponseEntity<List<VoteDetailResponse>> getVoteDetails(@RequestParam VoteOption option, @AuthenticationPrincipal SteamUserPrincipal principal)
+    {
+        if (principal == null)
+        {
+            return ResponseEntity.status(401).build();
+        }
+        return ResponseEntity.ok(voteService.getVoteDetails(principal.getHostId(), option));
     }
 
     @GetMapping("/dashboard")

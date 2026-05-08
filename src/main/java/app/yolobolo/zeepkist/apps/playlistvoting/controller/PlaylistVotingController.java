@@ -67,10 +67,10 @@ public class PlaylistVotingController
         }
 
         String loggedInHostId = principal != null ? principal.getHostId() : null;
-        boolean isOwner = host.getId().equals(loggedInHostId);
+        boolean isOwner = host != null && host.getId() != null && host.getId().equals(loggedInHostId);
 
-        List<VotingSession> allSessions = voteService.findAllSessions(host.getId());
-        VotingSession activeSession = sessionService.findActiveOrPausedSession(host.getId());
+        List<VotingSession> allSessions = host != null ? voteService.findAllSessions(host.getId()) : List.of();
+        VotingSession activeSession = host != null ? sessionService.findActiveOrPausedSession(host.getId()) : null;
 
         Level currentLevel = null;
         if (activeSession != null && activeSession.getCurrentLevelUid() != null)
@@ -85,7 +85,7 @@ public class PlaylistVotingController
         model.addAttribute("currentLevel", currentLevel);
 
         // Compatibility with existing template
-        model.addAttribute("token", isOwner ? host.getToken() : null);
+        model.addAttribute("token", (isOwner && host != null) ? host.getToken() : null);
         model.addAttribute("states", SessionState.values());
 
         return "apps/playlistvoting/dashboard";

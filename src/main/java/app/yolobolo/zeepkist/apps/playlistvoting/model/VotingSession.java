@@ -1,6 +1,7 @@
 package app.yolobolo.zeepkist.apps.playlistvoting.model;
 
 import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.SessionState;
+import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.VotingMode;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -30,6 +31,7 @@ public class VotingSession
     private boolean playlistMode;
     private boolean allowAbstain;
     private Map<String, String> vetoes; // uid -> "YES" / "NO"
+    private VotingMode votingMode;
 
     public VotingSession()
     {
@@ -39,9 +41,15 @@ public class VotingSession
         this.playlistMode = false;
         this.allowAbstain = true;
         this.vetoes = new HashMap<>();
+        this.votingMode = VotingMode.NORMAL;
         this.state = SessionState.ACTIVE;
         this.createdAt = Instant.now();
         this.lastUsed = Instant.now();
         this.lobbyTimer = "0:00";
+    }
+
+    public boolean isConnected()
+    {
+        return lastUsed != null && lastUsed.isAfter(Instant.now().minusSeconds(30));
     }
 }
