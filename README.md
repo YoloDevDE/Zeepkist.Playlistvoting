@@ -16,25 +16,25 @@ This project allows Zeepkist players to create voting sessions for their playlis
 The following diagram shows the interactions of different actors with the system.
 
 ```mermaid
-useCaseDiagram
-    actor Host
-    actor Voter
-    actor "Steam API" as Steam
+graph TD
+    Host((Host))
+    Voter((Voter))
+    Steam[Steam API]
 
-    package "Playlist Voting System" {
-        usecase "Create Session" as UC1
-        usecase "Set Level" as UC2
-        usecase "Cast Vote" as UC3
-        usecase "Export Playlist" as UC4
-        usecase "Login via Steam" as UC5
-    }
+    subgraph "Playlist Voting System"
+        UC1(Create Session)
+        UC2(Set Level)
+        UC3(Cast Vote)
+        UC4(Export Playlist)
+        UC5(Login via Steam)
+    end
 
-    Host --> UC1
-    Host --> UC2
-    Host --> UC4
-    Host --> UC5
-    Voter --> UC3
-    UC5 ..> Steam : verifies
+    Host --- UC1
+    Host --- UC2
+    Host --- UC4
+    Host --- UC5
+    Voter --- UC3
+    UC5 -. verifies .-> Steam
 ```
 
 ### Activity Diagram: Voting Process
@@ -42,23 +42,25 @@ useCaseDiagram
 This workflow describes how a level is set and votes are collected.
 
 ```mermaid
-activityDiagram
-    start
-    :Host sets current level;
-    :System opens voting for this level;
-    repeat
-        :Voter sends vote;
-        if (Vote valid?) then (yes)
-            :Save/Update vote;
-            :Update dashboard via WebSocket;
-        else (no)
-            :Return error message;
-        endif
-    backward:Next vote;
-    repeat while (Level finished?) is (no)
-    :Close voting for level;
-    :Save results in session history;
-    stop
+flowchart TD
+    Start([Start]) --> SetLevel[Host sets current level]
+    SetLevel --> OpenVoting[System opens voting for this level]
+
+    OpenVoting --> ReceiveVote[Voter sends vote]
+    ReceiveVote --> Valid{Vote valid?}
+
+    Valid -- Yes --> SaveVote[Save/Update vote]
+    SaveVote --> UpdateDash[Update dashboard via WebSocket]
+    UpdateDash --> Finished{Level finished?}
+
+    Valid -- No --> Error[Return error message]
+    Error --> Finished
+
+    Finished -- No --> ReceiveVote
+    Finished -- Yes --> CloseVoting[Close voting for level]
+
+    CloseVoting --> SaveResults[Save results in session history]
+    SaveResults --> Stop([Stop])
 ```
 
 ## Setup & Installation
@@ -82,8 +84,6 @@ activityDiagram
 
 Interactive API documentation (Swagger UI) is available after startup at:
 `http://localhost:8080/swagger-ui/index.html`
-
-A static description of the endpoints can also be found in [API_DOCUMENTATION.md](API_DOCUMENTATION.md).
 
 ## WebSocket Endpoints
 
