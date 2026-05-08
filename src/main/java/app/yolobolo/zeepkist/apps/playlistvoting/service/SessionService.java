@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -48,10 +49,10 @@ public class SessionService
         List<VotingSession> sessions = sessionRepository.findByHostId(hostId);
         return sessions.stream()
                 .filter(s -> s.getState() == SessionState.ACTIVE)
-                .findFirst()
+                .max(Comparator.comparing(VotingSession::getLastUsed))
                 .orElseGet(() -> sessions.stream()
                         .filter(s -> s.getState() == SessionState.PAUSED)
-                        .findFirst()
+                        .max(Comparator.comparing(VotingSession::getLastUsed))
                         .orElse(null));
     }
 

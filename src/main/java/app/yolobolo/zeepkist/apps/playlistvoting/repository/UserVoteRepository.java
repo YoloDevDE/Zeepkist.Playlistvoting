@@ -16,6 +16,8 @@ public interface UserVoteRepository extends MongoRepository<UserVote, String>
 
     void deleteBySessionId(String sessionId);
 
+    void deleteBySessionIdAndLevelUid(String sessionId, String levelUid);
+
     long countBySessionId(String sessionId);
 
     long countBySessionIdAndVote(String sessionId, VoteOption vote);

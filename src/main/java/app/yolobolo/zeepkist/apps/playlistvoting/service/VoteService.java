@@ -173,30 +173,36 @@ public class VoteService
 
     private void applyZeeplistToSession(VotingSession session, ZeeplistDTO zeeplist)
     {
-        List<String> playlistUids = new ArrayList<>();
+        Set<String> uniqueUids = new LinkedHashSet<>();
         if (zeeplist.getLevels() != null)
         {
             for (ZeeplistDTO.ZeeplistLevelDTO levelDto : zeeplist.getLevels())
             {
+                String uid = levelDto.getUid();
+                if (uid == null || uniqueUids.contains(uid))
+                {
+                    continue;
+                }
+
                 levelService.getOrCreateLevel(
-                        levelDto.getUid(),
+                        uid,
                         levelDto.getName(),
                         levelDto.getAuthor(),
                         levelDto.getWorkshopId()
                 );
-                playlistUids.add(levelDto.getUid());
+                uniqueUids.add(uid);
 
                 if (levelDto.isPlayed())
                 {
-                    if (!session.getPlayedLevels().contains(levelDto.getUid()))
+                    if (!session.getPlayedLevels().contains(uid))
                     {
-                        session.getPlayedLevels().add(levelDto.getUid());
+                        session.getPlayedLevels().add(uid);
                     }
-                    session.getLevelStatuses().put(levelDto.getUid(), "VOTING_FINISHED");
+                    session.getLevelStatuses().put(uid, "VOTING_FINISHED");
                 }
             }
         }
-        session.setPlaylist(playlistUids);
+        session.setPlaylist(new ArrayList<>(uniqueUids));
     }
 
     public void renameSession(String id, String newName, String hostId)
@@ -416,13 +422,27 @@ public class VoteService
     public VotingResultResponse getResultByHostId(String hostId)
     {
         VotingSession session = sessionService.findActiveOrPausedSession(hostId);
+        return getResultBySession(session);
+    }
+
+    public VotingResultResponse getResultBySession(VotingSession session)
+    {
+        if (session == null)
+        {
+            return null;
+        }
+        return getResultBySessionAndLevel(session, session.getCurrentLevelUid());
+    }
+
+    public VotingResultResponse getResultBySessionAndLevel(VotingSession session, String levelUid)
+    {
         if (session == null)
         {
             return null;
         }
 
-        Level level = session.getCurrentLevelUid() != null ? levelService.findById(session.getCurrentLevelUid()).orElse(null) : null;
-        List<UserVote> votes = session.getCurrentLevelUid() != null ? voteProcessingService.getVotes(session.getId(), session.getCurrentLevelUid()) : List.of();
+        Level level = levelUid != null ? levelService.findById(levelUid).orElse(null) : null;
+        List<UserVote> votes = levelUid != null ? voteProcessingService.getVotes(session.getId(), levelUid) : List.of();
 
         boolean canAbstain = session.getVotingMode() == VotingMode.ABSTAIN_ENABLED || session.isAllowAbstain();
         VotesResponse votesResponse = voteProcessingService.calculateVotesResponse(votes, canAbstain);
@@ -432,14 +452,14 @@ public class VoteService
                 .sessionState(session.getState().name())
                 .lobbyTimer(session.getLobbyTimer())
                 .level(LevelResponse.builder()
-                        .levelUid(session.getCurrentLevelUid())
+                        .levelUid(levelUid)
                         .levelName(level != null ? level.getName() : "None")
                         .levelAuthor(level != null ? level.getAuthor() : "None")
                         .workshopId(level != null ? level.getWorkshopID() : null)
-                        .status(session.getLevelStatuses().getOrDefault(session.getCurrentLevelUid(), "VOTING_ACTIVE"))
+                        .status(session.getLevelStatuses().getOrDefault(levelUid, "VOTING_ACTIVE"))
                         .build())
                 .votes(votesResponse)
-                .veto(session.getVetoes() != null ? session.getVetoes().get(session.getCurrentLevelUid()) : null)
+                .veto(session.getVetoes() != null ? session.getVetoes().get(levelUid) : null)
                 .build();
     }
 
@@ -1119,5 +1139,95 @@ public class VoteService
                 })
                 .sorted(Comparator.comparing(m -> (String) m.get("displayName")))
                 .collect(Collectors.toList());
+    }
+
+    public PlaylistVotingSessionInfoDto getSessionInfo(String token)
+    {
+        VotingSession session = findActiveSession(token);
+        return getPlaylistVotingSessionInfoDto(session);
+    }
+
+    public PlaylistVotingSessionInfoDto getPlaylistVotingSessionInfoDto(VotingSession session)
+    {
+        if (session == null)
+        {
+            return null;
+        }
+
+        List<String> playlist = session.getPlaylist() != null ? session.getPlaylist() : List.of();
+        int totalLevels = playlist.size();
+        int finalizedCount = (int) playlist.stream()
+                .filter(uid -> "VOTING_FINISHED".equals(session.getLevelStatuses().get(uid)))
+                .count();
+
+        return PlaylistVotingSessionInfoDto.builder()
+                .id(session.getId())
+                .displayName(session.getDisplayName())
+                .state(session.getState())
+                .playlistModeEnabled(session.isPlaylistMode())
+                .hasPlaylist(!playlist.isEmpty())
+                .playlistLevelCount(totalLevels)
+                .currentLevelUid(session.getCurrentLevelUid())
+                .totalLevelCount(totalLevels)
+                .finalizedLevelCount(finalizedCount)
+                .remainingLevelCount(totalLevels - finalizedCount)
+                .latestResult(getResultBySession(session))
+                .build();
+    }
+
+    public VotingSession findLatestActiveOrResumableSession(String token)
+    {
+        User user = findUserByToken(token);
+        if (user == null)
+        {
+            return null;
+        }
+        return sessionService.findActiveOrPausedSession(user.getId());
+    }
+
+    public void setPlaylistMode(String token, boolean enabled)
+    {
+        VotingSession session = findActiveSession(token);
+        if (session != null)
+        {
+            session.setPlaylistMode(enabled);
+            sessionService.save(session);
+            notifyUpdate(session.getHostId());
+        }
+    }
+
+    public void finalizeLevel(String token, String levelUid)
+    {
+        VotingSession session = findActiveSession(token);
+        if (session != null && levelUid != null)
+        {
+            if (!session.getPlayedLevels().contains(levelUid))
+            {
+                session.getPlayedLevels().add(levelUid);
+            }
+            session.getLevelStatuses().put(levelUid, "VOTING_FINISHED");
+            sessionService.save(session);
+            notifyUpdate(session.getHostId());
+        }
+    }
+
+    public void resetLevelVotes(String token, String levelUid)
+    {
+        VotingSession session = findActiveSession(token);
+        if (session != null && levelUid != null)
+        {
+            voteRepository.deleteBySessionIdAndLevelUid(session.getId(), levelUid);
+            notifyUpdate(session.getHostId());
+        }
+    }
+
+    public VotingResultResponse getLevelResult(String token, String levelUid)
+    {
+        VotingSession session = findActiveSession(token);
+        if (session == null)
+        {
+            return null;
+        }
+        return getResultBySessionAndLevel(session, levelUid);
     }
 }

@@ -301,6 +301,38 @@ public class PlaylistVotingRestController
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .body(json);
     }
+
+    @GetMapping("/sessions/active/playlist/to-be-voted")
+    @Operation(summary = "Download to-be-voted playlist", description = "Downloads a playlist containing only levels that have not been finalized yet.")
+    public ResponseEntity<byte[]> downloadToBeVotedPlaylist(@AuthenticationPrincipal SteamUserPrincipal principal)
+    {
+        if (principal == null)
+        {
+            return ResponseEntity.status(401).build();
+        }
+        VotingSession session = voteService.findActiveSession(principal.getToken());
+        if (session == null)
+        {
+            return ResponseEntity.notFound().build();
+        }
+        return downloadPlaylist(session.getId(), 360.0, false, null, "tovote", principal);
+    }
+
+    @GetMapping("/sessions/active/playlist/final")
+    @Operation(summary = "Download final playlist", description = "Downloads a playlist containing only levels with a 'YES' result.")
+    public ResponseEntity<byte[]> downloadFinalPlaylist(@AuthenticationPrincipal SteamUserPrincipal principal)
+    {
+        if (principal == null)
+        {
+            return ResponseEntity.status(401).build();
+        }
+        VotingSession session = voteService.findActiveSession(principal.getToken());
+        if (session == null)
+        {
+            return ResponseEntity.notFound().build();
+        }
+        return downloadPlaylist(session.getId(), 360.0, false, null, "yes", principal);
+    }
     // --- Voting ---
 
     @GetMapping("/votes")
@@ -385,6 +417,98 @@ public class PlaylistVotingRestController
             return ResponseEntity.badRequest().build();
         }
         return ResponseEntity.ok(playlist);
+    }
+
+    @GetMapping("/sessions/active")
+    @Operation(summary = "Get active session metadata", description = "Returns metadata about the currently active session for the authenticated user.")
+    public ResponseEntity<app.yolobolo.zeepkist.apps.playlistvoting.model.dto.response.PlaylistVotingSessionInfoDto> getActiveSessionInfo(@AuthenticationPrincipal SteamUserPrincipal principal)
+    {
+        if (principal == null)
+        {
+            return ResponseEntity.status(401).build();
+        }
+        app.yolobolo.zeepkist.apps.playlistvoting.model.dto.response.PlaylistVotingSessionInfoDto info = voteService.getSessionInfo(principal.getToken());
+        if (info == null)
+        {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(info);
+    }
+
+    @GetMapping("/sessions/latest-active")
+    @Operation(summary = "Get latest active or resumable session", description = "Returns the latest active or paused session for the authenticated user.")
+    public ResponseEntity<app.yolobolo.zeepkist.apps.playlistvoting.model.dto.response.PlaylistVotingSessionInfoDto> getLatestActiveSession(@AuthenticationPrincipal SteamUserPrincipal principal)
+    {
+        if (principal == null)
+        {
+            return ResponseEntity.status(401).build();
+        }
+        VotingSession session = voteService.findLatestActiveOrResumableSession(principal.getToken());
+        if (session == null)
+        {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(voteService.getPlaylistVotingSessionInfoDto(session));
+    }
+
+    @PatchMapping("/sessions/active/playlist-mode")
+    @Operation(summary = "Toggle playlist mode", description = "Enables or disables playlist mode for the active session.")
+    public ResponseEntity<Void> togglePlaylistMode(
+            @RequestBody PlaylistModeRequest request,
+            @AuthenticationPrincipal SteamUserPrincipal principal)
+    {
+        if (principal == null)
+        {
+            return ResponseEntity.status(401).build();
+        }
+        voteService.setPlaylistMode(principal.getToken(), request.isEnabled());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/sessions/active/levels/{levelUid}/finalize")
+    @Operation(summary = "Finalize a level", description = "Marks a specific level as finalized in the active session.")
+    public ResponseEntity<Void> finalizeLevel(
+            @PathVariable String levelUid,
+            @AuthenticationPrincipal SteamUserPrincipal principal)
+    {
+        if (principal == null)
+        {
+            return ResponseEntity.status(401).build();
+        }
+        voteService.finalizeLevel(principal.getToken(), levelUid);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/sessions/active/levels/{levelUid}/votes")
+    @Operation(summary = "Reset votes for a level", description = "Deletes all votes for a specific level in the active session.")
+    public ResponseEntity<Void> resetLevelVotes(
+            @PathVariable String levelUid,
+            @AuthenticationPrincipal SteamUserPrincipal principal)
+    {
+        if (principal == null)
+        {
+            return ResponseEntity.status(401).build();
+        }
+        voteService.resetLevelVotes(principal.getToken(), levelUid);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/sessions/active/levels/{levelUid}/result")
+    @Operation(summary = "Get level result", description = "Returns the voting result for a specific level in the active session.")
+    public ResponseEntity<VotingResultResponse> getLevelResult(
+            @PathVariable String levelUid,
+            @AuthenticationPrincipal SteamUserPrincipal principal)
+    {
+        if (principal == null)
+        {
+            return ResponseEntity.status(401).build();
+        }
+        VotingResultResponse result = voteService.getLevelResult(principal.getToken(), levelUid);
+        if (result == null)
+        {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(result);
     }
 
     @GetMapping("/vote-details")
