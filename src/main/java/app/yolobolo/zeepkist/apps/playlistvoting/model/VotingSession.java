@@ -26,11 +26,17 @@ public class VotingSession
     private Instant createdAt;
     private Instant lastUsed;
     private String lobbyTimer;
+    private List<String> playlist;
+    private boolean playlistMode;
+    private Map<String, String> vetoes; // uid -> "YES" / "NO"
 
     public VotingSession()
     {
         this.playedLevels = new ArrayList<>();
         this.levelStatuses = new HashMap<>();
+        this.playlist = new ArrayList<>();
+        this.playlistMode = false;
+        this.vetoes = new HashMap<>();
         this.state = SessionState.ACTIVE;
         this.createdAt = Instant.now();
         this.lastUsed = Instant.now();

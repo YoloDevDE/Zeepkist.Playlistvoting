@@ -76,6 +76,86 @@
         </div>
     </div>
 
+    <!-- Playlist Panel (Owner Only) -->
+    <div class="mb-10 hidden" id="playlistPanel" th:if="${isOwner}">
+        <div class="bg-brand-card border border-slate-800 rounded-2xl p-8 shadow-xl">
+            <h3 class="text-xl font-black mb-4 uppercase tracking-wider flex items-center gap-2">
+                <svg class="w-6 h-6 text-brand-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                          stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
+                </svg>
+                Playlist Management
+            </h3>
+            <div class="mb-4">
+                <label class="block text-xs font-black mb-2 uppercase tracking-widest text-brand-muted">Upload .zeeplist File</label>
+                <div class="flex flex-col gap-2">
+                    <input accept=".zeeplist,application/json"
+                           class="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-black file:bg-slate-800 file:text-white hover:file:bg-slate-700 cursor-pointer bg-slate-900/50 border border-slate-700 rounded-xl p-2"
+                           id="zeeplistFileUpload"
+                           type="file">
+                    <p class="text-[10px] text-slate-500 font-bold uppercase tracking-tight">
+                        <svg class="w-3 h-3 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round"
+                                  stroke-linejoin="round" stroke-width="2"/>
+                        </svg>
+                        Tip: Playlists are usually in <code class="text-brand-accent bg-slate-800 px-1 rounded">%AppData%\Roaming\Zeepkist\Playlists</code>
+                    </p>
+                </div>
+            </div>
+            <div class="flex flex-col sm:flex-row items-center gap-4">
+                <label class="flex items-center gap-2 cursor-pointer group">
+                    <input class="w-5 h-5 rounded border-slate-700 bg-slate-900 text-brand-accent focus:ring-brand-accent focus:ring-offset-0"
+                           id="playlistModeCheckbox"
+                           type="checkbox">
+                    <span class="text-sm font-bold text-slate-400 group-hover:text-white transition-colors">Playlist Mode Active</span>
+                </label>
+                <button class="w-full sm:w-auto sm:ml-auto px-8 py-3 bg-brand-accent text-brand-dark rounded-xl font-black text-sm transition-all hover:scale-105 shadow-lg shadow-brand-accent/20"
+                        onclick="updatePlaylist()">
+                    SAVE SETTINGS
+                </button>
+            </div>
+
+            <!-- Download Playlist Section -->
+            <div class="mt-8 pt-8 border-t border-slate-800">
+                <h4 class="text-xs font-black mb-4 uppercase tracking-widest text-brand-muted">Export Session Data (.zeeplist)</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <button class="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 border border-slate-700"
+                            onclick="downloadActivePlaylist('all')">
+                        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M7 10l5 5m0 0l5-5m-5 5V3" stroke-linecap="round"
+                                  stroke-linejoin="round" stroke-width="2"/>
+                        </svg>
+                        FULL PLAYLIST
+                    </button>
+                    <button class="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 border border-slate-700"
+                            onclick="downloadActivePlaylist('tovote')">
+                        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round"
+                                  stroke-linejoin="round" stroke-width="2"/>
+                        </svg>
+                        TO VOTE
+                    </button>
+                    <button class="px-4 py-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 rounded-xl text-xs font-bold transition-all border border-emerald-500/20 flex items-center justify-center gap-2"
+                            onclick="downloadActivePlaylist('yes')">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round"
+                                  stroke-linejoin="round" stroke-width="2"/>
+                        </svg>
+                        YES VOTES
+                    </button>
+                    <button class="px-4 py-3 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 rounded-xl text-xs font-bold transition-all border border-rose-500/20 flex items-center justify-center gap-2"
+                            onclick="downloadActivePlaylist('no')">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round"
+                                  stroke-linejoin="round" stroke-width="2"/>
+                        </svg>
+                        NO VOTES
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Active Level Status -->
     <div class="mb-10" id="activeLevelPanel">
         <!-- Will be populated by JS -->
@@ -117,6 +197,37 @@
                                    id="newSessionName" placeholder="My Awesome Stream" required
                                    type="text">
                         </div>
+                        <div class="pt-4 border-t border-slate-800">
+                            <label class="flex items-center gap-2 cursor-pointer group mb-4">
+                                <input class="w-5 h-5 rounded border-slate-700 bg-slate-900 text-brand-accent focus:ring-brand-accent focus:ring-offset-0"
+                                       id="newSessionPlaylistMode"
+                                       onchange="document.getElementById('playlistConfigSection').classList.toggle('hidden', !this.checked)"
+                                       type="checkbox">
+                                <span class="text-sm font-bold text-slate-400 group-hover:text-white transition-colors">Playlist Mode</span>
+                            </label>
+
+                            <div class="space-y-4 hidden" id="playlistConfigSection">
+                                <div>
+                                    <label class="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Initial Playlist
+                                        (.zeeplist)</label>
+                                    <input accept=".zeeplist,application/json"
+                                           class="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-black file:bg-slate-800 file:text-white hover:file:bg-slate-700 cursor-pointer bg-slate-900/50 border border-slate-700 rounded-xl p-2"
+                                           id="newSessionPlaylistFile"
+                                           type="file">
+                                    <p class="text-[10px] text-slate-500 mt-1 uppercase font-bold">Hint: Session name will match playlist
+                                        name</p>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Round Length
+                                        (Seconds)</label>
+                                    <input class="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-brand-accent transition-all"
+                                           id="newSessionRoundLength"
+                                           step="1"
+                                           type="number"
+                                           value="300">
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="mt-8 flex gap-3">
                         <button class="flex-1 px-4 py-3 bg-slate-800 hover:bg-slate-700 rounded-xl font-bold transition-all border border-slate-700"
@@ -153,6 +264,23 @@
             $('#newSessionBtn').on('click', openModal);
             $('#cancelModalBtn, #modalBackdrop').on('click', closeModal);
             $('#submitCreateSessionBtn').on('click', createNewSession);
+
+            $('#newSessionPlaylistFile').on('change', function (e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function (e) {
+                        try {
+                            const zeeplist = JSON.parse(e.target.result);
+                            if (zeeplist.name && !$('#newSessionName').val()) {
+                                $('#newSessionName').val(zeeplist.name);
+                            }
+                        } catch (err) {
+                        }
+                    };
+                    reader.readAsText(file);
+                }
+            });
 
             // Global delegate for dynamic elements
             $(document).on('click', '[data-session-toggle]', function () {
@@ -246,11 +374,18 @@
         }
 
         function renderDashboard(data) {
-            renderActiveLevel(data.currentLevel, data.currentVotes, data.activeSessionName, data.lobbyTimer);
+            renderActiveLevel(data.currentLevel, data.currentVotes, data.activeSessionName, data.lobbyTimer, data.playlistMode, data.currentVeto);
             renderSessions(data.sessions);
+
+            if (isOwner && data.activeSessionName) {
+                $('#playlistPanel').removeClass('hidden');
+                $('#playlistModeCheckbox').prop('checked', data.playlistMode);
+            } else {
+                $('#playlistPanel').addClass('hidden');
+            }
         }
 
-        function renderActiveLevel(level, votes, activeSessionName, lobbyTimer) {
+        function renderActiveLevel(level, votes, activeSessionName, lobbyTimer, playlistMode, currentVeto) {
             const $panel = $('#activeLevelPanel');
             if (!$panel.length) return;
 
@@ -343,6 +478,24 @@
                     <p class="text-brand-muted font-bold text-lg">by ${level.author}</p>
                     ${level.workshopID ? `<a href="https://steamcommunity.com/sharedfiles/filedetails/?id=${level.workshopID}" target="_blank" class="text-steam-accent hover:underline text-[10px] block mt-1">Steam Workshop</a>` : ''}
                     ${voteHtml}
+                    
+                    ${isOwner ? `
+                    <div class="mt-8 pt-8 border-t border-slate-800">
+                        <div class="flex flex-col sm:flex-row items-center gap-4">
+                            <span class="text-[10px] font-black text-brand-muted uppercase tracking-widest">Host Veto</span>
+                            <div class="flex gap-2 w-full sm:w-auto">
+                                <button onclick="castVeto('${level.uid}', 'YES')" class="flex-1 sm:flex-initial px-4 py-2 bg-green-600/20 hover:bg-green-600 text-green-400 hover:text-white border border-green-600/30 rounded-lg text-xs font-bold transition-all ${currentVeto === 'YES' ? 'bg-green-600 text-white ring-2 ring-green-400 ring-offset-2 ring-offset-brand-dark' : ''}">VETO YES</button>
+                                <button onclick="castVeto('${level.uid}', 'NO')" class="flex-1 sm:flex-initial px-4 py-2 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white border border-red-600/30 rounded-lg text-xs font-bold transition-all ${currentVeto === 'NO' ? 'bg-red-600 text-white ring-2 ring-red-400 ring-offset-2 ring-offset-brand-dark' : ''}">VETO NO</button>
+                                <button onclick="castVeto('${level.uid}', null)" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-lg text-xs font-bold transition-all">CLEAR</button>
+                            </div>
+                            ${currentVeto ? `<span class="text-xs font-bold text-brand-accent animate-pulse uppercase">Vetoed: ${currentVeto}</span>` : ''}
+                        </div>
+                    </div>
+                    ` : (currentVeto ? `
+                    <div class="mt-6 p-4 bg-brand-accent/5 border border-brand-accent/20 rounded-xl text-center">
+                        <span class="text-xs font-bold text-brand-accent uppercase tracking-widest">Host has vetoed this level: ${currentVeto}</span>
+                    </div>
+                    ` : '')}
                     
                     ${isLoggedIn ? `
                         <div class="mt-8 flex gap-4">
@@ -494,6 +647,7 @@
                                     <span class="text-[10px] text-brand-muted">by ${level.author}</span>
                                     ${level.isCurrent ? '<span class="bg-brand-accent/20 text-brand-accent text-[9px] px-1.5 py-0.5 rounded font-black uppercase">CURRENT</span>' : ''}
                                     ${level.status === 'VOTING_FINISHED' ? '<span class="bg-slate-700/50 text-slate-400 text-[9px] px-1.5 py-0.5 rounded font-black uppercase">Voting Finished</span>' : ''}
+                                    ${level.veto ? `<span class="bg-${level.veto === 'YES' ? 'green' : 'red'}-600/30 text-${level.veto === 'YES' ? 'green' : 'red'}-400 text-[9px] px-1.5 py-0.5 rounded font-black uppercase border border-${level.veto === 'YES' ? 'green' : 'red'}-600/50">VETO: ${level.veto}</span>` : ''}
                                     ${level.workshopID ? `<a href="https://steamcommunity.com/sharedfiles/filedetails/?id=${level.workshopID}" target="_blank" class="text-steam-accent hover:underline text-[10px]" onclick="event.stopPropagation()">Steam Workshop</a>` : ''}
                                 </div>
                             </div>
@@ -650,31 +804,124 @@
 
         function createNewSession() {
             const name = $('#newSessionName').val();
+            const playlistMode = $('#newSessionPlaylistMode').prop('checked');
+            const roundLength = parseFloat($('#newSessionRoundLength').val()) || 300;
+            const fileInput = document.getElementById('newSessionPlaylistFile');
+
             if (!name) {
                 alert('Please enter a session name');
                 return;
             }
 
+            const sendRequest = (zeeplistData) => {
+                $.ajax({
+                    url: '/api/playlistvoting/sessions',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        name: name,
+                        playlistMode: playlistMode,
+                        roundLength: roundLength,
+                        zeeplist: zeeplistData
+                    }),
+                    success: function () {
+                        closeModal();
+                        fetchDashboardData();
+                    },
+                    error: function (xhr) {
+                        let msg = 'Failed to create session';
+                        try {
+                            const data = JSON.parse(xhr.responseText);
+                            if (data.message) msg += ': ' + data.message;
+                        } catch (e) {
+                        }
+                        alert(msg);
+                    }
+                });
+            };
+
+            if (playlistMode && fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    try {
+                        const zeeplist = JSON.parse(e.target.result);
+                        sendRequest(zeeplist);
+                    } catch (err) {
+                        alert('Error parsing .zeeplist file: ' + err.message);
+                    }
+                };
+                reader.readAsText(file);
+            } else {
+                sendRequest(null);
+            }
+        }
+
+        function castVeto(uid, veto) {
             $.ajax({
-                url: '/api/playlistvoting/sessions',
+                url: '/api/playlistvoting/sessions/active/veto',
                 method: 'POST',
                 contentType: 'application/json',
-                data: JSON.stringify({name: name}),
-                success: function () {
-                    closeModal();
-                    fetchDashboardData();
-                },
+                data: JSON.stringify({uid: uid, veto: veto}),
                 error: function (xhr) {
-                    let msg = 'Failed to create session';
-                    try {
-                        const data = JSON.parse(xhr.responseText);
-                        if (data.message) msg += ': ' + data.message;
-                    } catch (e) {
-                    }
-                    alert(msg);
+                    alert('Veto failed: ' + xhr.responseText);
                 }
             });
         }
+
+        function updatePlaylist() {
+            const fileInput = document.getElementById('zeeplistFileUpload');
+            const mode = $('#playlistModeCheckbox').prop('checked');
+
+            if (fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    try {
+                        const zeeplist = JSON.parse(e.target.result);
+                        sendPlaylistUpdate({
+                            zeeplist: zeeplist,
+                            playlistMode: mode
+                        });
+                        fileInput.value = ''; // Reset file input
+                    } catch (err) {
+                        alert('Error parsing .zeeplist file: ' + err.message);
+                    }
+                };
+                reader.readAsText(file);
+            } else {
+                sendPlaylistUpdate({
+                    playlistMode: mode
+                });
+            }
+        }
+
+        function sendPlaylistUpdate(data) {
+            $.ajax({
+                url: '/api/playlistvoting/sessions/active/playlist',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(data),
+                success: function () {
+                    // Feedback handled by WebSocket
+                    $('#playlistInput').val(''); // Clear manual input on success
+                },
+                error: function (xhr) {
+                    alert('Update playlist failed: ' + xhr.responseText);
+                }
+            });
+        }
+
+        function downloadActivePlaylist(type) {
+            if (!currentData || !currentData.sessions) return;
+            const activeSession = currentData.sessions.find(s => s.displayName === currentData.activeSessionName);
+            if (!activeSession) {
+                alert("No active session found to download.");
+                return;
+            }
+            window.location.href = `/api/playlistvoting/sessions/${activeSession.id}/playlist?type=${type}`;
+        }
+
     </script>
 </div>
 
