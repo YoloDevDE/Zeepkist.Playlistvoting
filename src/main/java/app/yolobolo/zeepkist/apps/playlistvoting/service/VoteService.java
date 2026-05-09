@@ -800,10 +800,22 @@ public class VoteService
         return stats;
     }
 
-    public List<VoteDetailResponse> getVoteDetails(String hostId, VoteOption option)
+    public List<VoteDetailResponse> getVoteDetails(String hostId, String sessionId, VoteOption option)
     {
-        List<VotingSession> sessions = sessionService.findByHostId(hostId);
-        List<String> sessionIds = sessions.stream().map(VotingSession::getId).toList();
+        List<String> sessionIds;
+        if (sessionId != null)
+        {
+            sessionIds = List.of(sessionId);
+        }
+        else
+        {
+            VotingSession active = sessionService.findActiveOrPausedSession(hostId);
+            if (active == null)
+            {
+                return List.of();
+            }
+            sessionIds = List.of(active.getId());
+        }
 
         List<UserVote> votesWithOption = voteRepository.findBySessionIdInAndVote(sessionIds, option);
         List<String> levelUids = votesWithOption.stream()
@@ -1160,6 +1172,8 @@ public class VoteService
                 .filter(uid -> "VOTING_FINISHED".equals(session.getLevelStatuses().get(uid)))
                 .count();
 
+        int historyCount = session.getPlayedLevels() != null ? session.getPlayedLevels().size() : 0;
+
         return PlaylistVotingSessionInfoDto.builder()
                 .id(session.getId())
                 .displayName(session.getDisplayName())
@@ -1171,6 +1185,7 @@ public class VoteService
                 .totalLevelCount(totalLevels)
                 .finalizedLevelCount(finalizedCount)
                 .remainingLevelCount(totalLevels - finalizedCount)
+                .historyLevelCount(historyCount)
                 .latestResult(getResultBySession(session))
                 .build();
     }

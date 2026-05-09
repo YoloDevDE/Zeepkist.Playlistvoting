@@ -48,12 +48,9 @@ public class SessionService
         }
         List<VotingSession> sessions = sessionRepository.findByHostId(hostId);
         return sessions.stream()
-                .filter(s -> s.getState() == SessionState.ACTIVE)
+                .filter(s -> s.getState() == SessionState.ACTIVE || s.getState() == SessionState.PAUSED)
                 .max(Comparator.comparing(VotingSession::getLastUsed))
-                .orElseGet(() -> sessions.stream()
-                        .filter(s -> s.getState() == SessionState.PAUSED)
-                        .max(Comparator.comparing(VotingSession::getLastUsed))
-                        .orElse(null));
+                .orElse(null);
     }
 
     public VotingSession createSession(User user, String displayName)

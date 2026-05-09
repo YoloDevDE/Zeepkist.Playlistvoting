@@ -18,5 +18,6 @@ public class PlaylistVotingSessionInfoDto
     private int totalLevelCount;
     private int finalizedLevelCount;
     private int remainingLevelCount;
+    private int historyLevelCount;
     private VotingResultResponse latestResult;
 }

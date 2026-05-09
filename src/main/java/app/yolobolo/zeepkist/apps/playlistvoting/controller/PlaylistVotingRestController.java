@@ -512,14 +512,17 @@ public class PlaylistVotingRestController
     }
 
     @GetMapping("/vote-details")
-    @Operation(summary = "Get detailed vote statistics", description = "Returns levels and voters for a specific vote option across all host's sessions.")
-    public ResponseEntity<List<VoteDetailResponse>> getVoteDetails(@RequestParam VoteOption option, @AuthenticationPrincipal SteamUserPrincipal principal)
+    @Operation(summary = "Get detailed vote statistics", description = "Returns levels and voters for a specific vote option for the active session (or specified sessionId).")
+    public ResponseEntity<List<VoteDetailResponse>> getVoteDetails(
+            @RequestParam VoteOption option,
+            @RequestParam(required = false) String sessionId,
+            @AuthenticationPrincipal SteamUserPrincipal principal)
     {
         if (principal == null)
         {
             return ResponseEntity.status(401).build();
         }
-        return ResponseEntity.ok(voteService.getVoteDetails(principal.getHostId(), option));
+        return ResponseEntity.ok(voteService.getVoteDetails(principal.getHostId(), sessionId, option));
     }
 
     @GetMapping("/dashboard")

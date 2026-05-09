@@ -94,7 +94,7 @@ class VoteServiceTest
         session.setId("session-id");
         session.setHostId(hostId);
 
-        when(sessionService.findByHostId(hostId)).thenReturn(List.of(session));
+        when(sessionService.findActiveOrPausedSession(hostId)).thenReturn(session);
 
         UserVote vote = new UserVote();
         vote.setSessionId("session-id");
@@ -113,7 +113,7 @@ class VoteServiceTest
                 .build();
         when(levelService.findById("level-uid")).thenReturn(Optional.of(level));
 
-        var details = voteService.getVoteDetails(hostId, VoteOption.YES);
+        var details = voteService.getVoteDetails(hostId, null, VoteOption.YES);
 
         assertNotNull(details);
         assertEquals(1, details.size());
