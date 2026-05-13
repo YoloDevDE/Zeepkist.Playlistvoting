@@ -26,7 +26,6 @@ repositories {
 
 dependencies {
     implementation libs.spring.boot.starter.data.mongodb
-    implementation libs.spring.boot.starter.data.rest
     implementation libs.spring.boot.starter.security
     implementation libs.spring.boot.starter.security.oauth2.client
     implementation libs.spring.boot.starter.thymeleaf
@@ -48,7 +47,7 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
-    // Support for Mockito inline mock maker on Java 17+
-    jvmArgs("-javaagent:${configurations.testRuntimeClasspath.find { it.name.contains("mockito-core") }.absolutePath}")
+    // Attach Mockito as a Java agent (required for the inline mock maker on the current JDK).
+    jvmArgs("-javaagent:${configurations.testRuntimeClasspath.find { it.name.contains('mockito-core') }.absolutePath}")
 }
 
