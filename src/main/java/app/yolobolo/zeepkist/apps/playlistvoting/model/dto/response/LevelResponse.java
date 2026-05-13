@@ -1,6 +1,7 @@
 package app.yolobolo.zeepkist.apps.playlistvoting.model.dto.response;
 
 
+import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.LevelStatus;
 import lombok.Builder;
 import lombok.Data;
 
@@ -12,5 +13,5 @@ public class LevelResponse
     private String levelName;
     private String levelAuthor;
     private Long workshopId;
-    private String status;
+    private LevelStatus status;
 }

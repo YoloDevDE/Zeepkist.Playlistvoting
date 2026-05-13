@@ -1,7 +1,6 @@
 package app.yolobolo.zeepkist.apps.playlistvoting.model;
 
-import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.SessionState;
-import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.VotingMode;
+import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.*;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -22,15 +21,19 @@ public class VotingSession
     private String displayName;
     private String currentLevelUid;
     private List<String> playedLevels;
-    private Map<String, String> levelStatuses;
+    private Map<String, LevelStatus> levelStatuses;
     private SessionState state;
     private Instant createdAt;
     private Instant lastUsed;
+    private double roundTime;
+    private double levelLoadedAtTime;
+    private double currentTime;
+    private LobbyGameState lobbyGameState;
     private String lobbyTimer;
     private List<String> playlist;
     private boolean playlistMode;
     private boolean allowAbstain;
-    private Map<String, String> vetoes; // uid -> "YES" / "NO"
+    private Map<String, VetoValue> vetoes;
     private VotingMode votingMode;
 
     public VotingSession()
@@ -45,7 +48,7 @@ public class VotingSession
         this.state = SessionState.ACTIVE;
         this.createdAt = Instant.now();
         this.lastUsed = Instant.now();
-        this.lobbyTimer = "0:00";
+        this.lobbyGameState = LobbyGameState.GAME;
     }
 
     public boolean isConnected()
