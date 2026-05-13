@@ -585,13 +585,13 @@ public class PlaylistVotingRestController
 
     @PostMapping("/sessions/active/timer")
     @Operation(summary = "Update lobby timer", description = "Updates the countdown timer for the active lobby.")
-    public ResponseEntity<Void> updateLobbyTimer(@RequestParam String timer, @AuthenticationPrincipal SteamUserPrincipal principal)
+    public ResponseEntity<Void> updateLobbyTimer(@RequestBody LobbyTimerRequest request, @AuthenticationPrincipal SteamUserPrincipal principal)
     {
         if (principal == null)
         {
             return ResponseEntity.status(401).build();
         }
-        voteService.updateLobbyTimer(principal.getToken(), timer);
+        voteService.updateLobbyTimer(principal.getToken(), request);
         return ResponseEntity.noContent().build();
     }
 

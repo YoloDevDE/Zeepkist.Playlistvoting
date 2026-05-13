@@ -1,5 +1,6 @@
 package app.yolobolo.zeepkist.apps.playlistvoting.controller;
 
+import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.request.LobbyTimerRequest;
 import app.yolobolo.zeepkist.apps.playlistvoting.service.VoteService;
 import app.yolobolo.zeepkist.common.model.SteamUserPrincipal;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +20,7 @@ public class PlaylistVotingWebSocketController
     private final VoteService voteService;
 
     @MessageMapping("/timer")
-    public void updateLobbyTimer(@Payload String timer, Principal principal)
+    public void updateLobbyTimer(@Payload LobbyTimerRequest request, Principal principal)
     {
         if (!(principal instanceof UsernamePasswordAuthenticationToken auth))
         {
@@ -33,7 +34,7 @@ public class PlaylistVotingWebSocketController
             return;
         }
 
-        log.info("Lobby timer update via WebSocket for host: {} - timer: {}", userPrincipal.getHostId(), timer);
-        voteService.updateLobbyTimer(userPrincipal.getToken(), timer);
+        log.debug("Lobby timer update via WebSocket for host: {} - timer: {}", userPrincipal.getHostId(), request);
+        voteService.updateLobbyTimer(userPrincipal.getToken(), request);
     }
 }

@@ -5,9 +5,7 @@ import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.request.SessionSettin
 import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.request.UpdatePlaylistRequest;
 import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.response.PlaylistResponse;
 import app.yolobolo.zeepkist.apps.playlistvoting.model.dto.response.VotingResultResponse;
-import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.Platform;
-import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.SessionState;
-import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.VoteOption;
+import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.*;
 import app.yolobolo.zeepkist.apps.playlistvoting.service.VoteService;
 import app.yolobolo.zeepkist.common.model.SteamUserPrincipal;
 import app.yolobolo.zeepkist.common.model.User;
@@ -136,10 +134,11 @@ class PlaylistVotingRestControllerTest
     {
         mockMvc.perform(post("/api/playlistvoting/sessions/active/timer")
                         .requestAttr("useTestUser", true)
-                        .param("timer", "7:00"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roundTime\": 300.0, \"levelLoadedAtTime\": 1000.0, \"currentTime\": 1100.0, \"gameState\": 0}"))
                 .andExpect(status().isNoContent());
 
-        verify(voteService).updateLobbyTimer("SESSION_TOKEN", "7:00");
+        verify(voteService).updateLobbyTimer(eq("SESSION_TOKEN"), any());
     }
 
     @Test
@@ -355,7 +354,7 @@ class PlaylistVotingRestControllerTest
                         .content("{\"uid\": \"level-uid\", \"veto\": \"YES\"}"))
                 .andExpect(status().isNoContent());
 
-        verify(voteService).vetoLevel(eq("SESSION_TOKEN"), eq("level-uid"), eq("YES"));
+        verify(voteService).vetoLevel(eq("SESSION_TOKEN"), eq("level-uid"), eq(VetoValue.YES));
     }
 
     @Test
@@ -367,7 +366,7 @@ class PlaylistVotingRestControllerTest
                         .content("{\"uid\": \"level-uid\", \"veto\": \"YES\"}"))
                 .andExpect(status().isNoContent());
 
-        verify(voteService).vetoLevel(eq("session-id"), eq("level-uid"), eq("YES"), eq("user-id"));
+        verify(voteService).vetoLevel(eq("session-id"), eq("level-uid"), eq(VetoValue.YES), eq("user-id"));
     }
 
     @Test
@@ -376,10 +375,10 @@ class PlaylistVotingRestControllerTest
         mockMvc.perform(patch("/api/playlistvoting/sessions/session-id/levels/status")
                         .requestAttr("useTestUser", true)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"uid\": \"level-uid\", \"status\": \"PLAYED\"}"))
+                        .content("{\"uid\": \"level-uid\", \"status\": \"VOTING_FINISHED\"}"))
                 .andExpect(status().isNoContent());
 
-        verify(voteService).updateLevelStatus(eq("session-id"), eq("level-uid"), eq("PLAYED"), eq("user-id"));
+        verify(voteService).updateLevelStatus(eq("session-id"), eq("level-uid"), eq(LevelStatus.VOTING_FINISHED), eq("user-id"));
     }
 
     @Test

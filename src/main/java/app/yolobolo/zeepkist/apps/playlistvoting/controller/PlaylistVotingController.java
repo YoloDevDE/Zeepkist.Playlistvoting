@@ -48,11 +48,11 @@ public class PlaylistVotingController
     @GetMapping("/dashboard")
     public String myDashboard(@AuthenticationPrincipal SteamUserPrincipal principal)
     {
-        if (principal != null && principal.getSteamId() != null)
+        if (principal == null || principal.getSteamId() == null)
         {
-            return "redirect:/playlistvoting/" + principal.getSteamId();
+            return "redirect:/playlistvoting";
         }
-        return "redirect:/playlistvoting";
+        return "redirect:/playlistvoting/" + principal.getSteamId();
     }
 
     @GetMapping("/{steamId}")
@@ -67,10 +67,10 @@ public class PlaylistVotingController
         }
 
         String loggedInHostId = principal != null ? principal.getHostId() : null;
-        boolean isOwner = host != null && host.getId() != null && host.getId().equals(loggedInHostId);
+        boolean isOwner = host.getId() != null && host.getId().equals(loggedInHostId);
 
-        List<VotingSession> allSessions = host != null ? voteService.findAllSessions(host.getId()) : List.of();
-        VotingSession activeSession = host != null ? sessionService.findActiveOrPausedSession(host.getId()) : null;
+        List<VotingSession> allSessions = voteService.findAllSessions(host.getId());
+        VotingSession activeSession = sessionService.findActiveOrPausedSession(host.getId());
 
         Level currentLevel = null;
         if (activeSession != null && activeSession.getCurrentLevelUid() != null)
@@ -85,7 +85,7 @@ public class PlaylistVotingController
         model.addAttribute("currentLevel", currentLevel);
 
         // Compatibility with existing template
-        model.addAttribute("token", (isOwner && host != null) ? host.getToken() : null);
+        model.addAttribute("token", isOwner ? host.getToken() : null);
         model.addAttribute("states", SessionState.values());
 
         return "apps/playlistvoting/dashboard";
