@@ -58,13 +58,14 @@ public class VoteProcessingService
         Optional<UserVote> existing = voteRepository.findBySessionIdAndLevelUidAndPlatformAndPlatformUserId(
                 sessionId, levelUid, platform, platformUserId);
 
-        if (existing.isPresent())
+        if (existing.isEmpty())
         {
-            voteRepository.delete(existing.get());
-            log.info("Vote removed for {} on {} (Level: {})", platformUserId, platform, levelUid);
-            return "Vote removed";
+            return "No vote found to remove";
         }
-        return "No vote found to remove";
+
+        voteRepository.delete(existing.get());
+        log.info("Vote removed for {} on {} (Level: {})", platformUserId, platform, levelUid);
+        return "Vote removed";
     }
 
     public void resetVotes(String sessionId)

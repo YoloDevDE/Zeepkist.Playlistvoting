@@ -1,6 +1,7 @@
 package app.yolobolo.zeepkist.apps.playlistvoting.service;
 
 import app.yolobolo.zeepkist.apps.playlistvoting.model.VotingSession;
+import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.LevelStatus;
 import app.yolobolo.zeepkist.apps.playlistvoting.model.enums.SessionState;
 import app.yolobolo.zeepkist.apps.playlistvoting.repository.VotingSessionRepository;
 import app.yolobolo.zeepkist.common.model.User;
@@ -77,93 +78,95 @@ public class SessionService
 
     public void renameSession(String id, String newName, String hostId)
     {
-        sessionRepository.findById(id).ifPresent(session ->
+        VotingSession session = sessionRepository.findById(id).orElse(null);
+        if (session == null || !session.getHostId().equals(hostId))
         {
-            if (session.getHostId().equals(hostId))
-            {
-                session.setDisplayName(newName);
-                sessionRepository.save(session);
-                log.info("Session {} renamed to '{}'", id, newName);
-            }
-        });
+            return;
+        }
+
+        session.setDisplayName(newName);
+        sessionRepository.save(session);
+        log.info("Session {} renamed to '{}'", id, newName);
     }
 
     public void updateSessionState(String id, SessionState state, String hostId)
     {
-        sessionRepository.findById(id).ifPresent(session ->
+        VotingSession session = sessionRepository.findById(id).orElse(null);
+        if (session == null || !session.getHostId().equals(hostId))
         {
-            if (session.getHostId().equals(hostId))
+            return;
+        }
+
+        if (state == SessionState.ACTIVE)
+        {
+            // Pause all other active/paused sessions
+            List<VotingSession> otherSessions = sessionRepository.findByHostId(hostId);
+            for (VotingSession s : otherSessions)
             {
-                if (state == SessionState.ACTIVE)
+                if (!s.getId().equals(id) && s.getState() != SessionState.FINISHED)
                 {
-                    // Pause all other active/paused sessions
-                    List<VotingSession> otherSessions = sessionRepository.findByHostId(hostId);
-                    for (VotingSession s : otherSessions)
-                    {
-                        if (!s.getId().equals(id) && s.getState() != SessionState.FINISHED)
-                        {
-                            s.setState(SessionState.PAUSED);
-                            sessionRepository.save(s);
-                        }
-                    }
+                    s.setState(SessionState.PAUSED);
+                    sessionRepository.save(s);
                 }
-                if (state == SessionState.FINISHED && session.getCurrentLevelUid() != null)
-                {
-                    session.getLevelStatuses().put(session.getCurrentLevelUid(), "VOTING_FINISHED");
-                }
-                session.setState(state);
-                sessionRepository.save(session);
-                log.info("Session {} state changed to {}", id, state);
             }
-        });
+        }
+
+        if (state == SessionState.FINISHED && session.getCurrentLevelUid() != null)
+        {
+            session.getLevelStatuses().put(session.getCurrentLevelUid(), LevelStatus.VOTING_FINISHED);
+        }
+
+        session.setState(state);
+        sessionRepository.save(session);
+        log.info("Session {} state changed to {}", id, state);
     }
 
     public void updateSessionSettings(String id, app.yolobolo.zeepkist.apps.playlistvoting.model.dto.request.SessionSettingsRequest settings, String hostId)
     {
-        sessionRepository.findById(id).ifPresent(session ->
+        VotingSession session = sessionRepository.findById(id).orElse(null);
+        if (session == null || !session.getHostId().equals(hostId))
         {
-            if (session.getHostId().equals(hostId))
-            {
-                if (settings.getDisplayName() != null)
-                {
-                    session.setDisplayName(settings.getDisplayName());
-                }
-                if (settings.getPlaylist() != null)
-                {
-                    session.setPlaylist(settings.getPlaylist());
-                }
+            return;
+        }
 
-                boolean hasPlaylist = (session.getPlaylist() != null && !session.getPlaylist().isEmpty());
-                session.setPlaylistMode(settings.isPlaylistMode() && hasPlaylist);
-                if (settings.getVotingMode() != null)
-                {
-                    session.setVotingMode(settings.getVotingMode());
-                    session.setAllowAbstain(settings.getVotingMode() == app.yolobolo.zeepkist.apps.playlistvoting.model.enums.VotingMode.ABSTAIN_ENABLED);
-                }
+        if (settings.getDisplayName() != null)
+        {
+            session.setDisplayName(settings.getDisplayName());
+        }
+        if (settings.getPlaylist() != null)
+        {
+            session.setPlaylist(settings.getPlaylist());
+        }
 
-                if (settings.getState() != null && settings.getState() != session.getState())
-                {
-                    updateSessionState(id, settings.getState(), hostId);
-                }
-                else
-                {
-                    sessionRepository.save(session);
-                }
-                log.info("Session {} settings updated", id);
-            }
-        });
+        boolean hasPlaylist = (session.getPlaylist() != null && !session.getPlaylist().isEmpty());
+        session.setPlaylistMode(settings.isPlaylistMode() && hasPlaylist);
+        if (settings.getVotingMode() != null)
+        {
+            session.setVotingMode(settings.getVotingMode());
+            session.setAllowAbstain(settings.getVotingMode() == app.yolobolo.zeepkist.apps.playlistvoting.model.enums.VotingMode.ABSTAIN_ENABLED);
+        }
+
+        if (settings.getState() != null && settings.getState() != session.getState())
+        {
+            updateSessionState(id, settings.getState(), hostId);
+        }
+        else
+        {
+            sessionRepository.save(session);
+        }
+        log.info("Session {} settings updated", id);
     }
 
     public void deleteSession(String id, String hostId)
     {
-        sessionRepository.findById(id).ifPresent(session ->
+        VotingSession session = sessionRepository.findById(id).orElse(null);
+        if (session == null || !session.getHostId().equals(hostId))
         {
-            if (session.getHostId().equals(hostId))
-            {
-                sessionRepository.delete(session);
-                log.info("Session {} deleted", id);
-            }
-        });
+            return;
+        }
+
+        sessionRepository.delete(session);
+        log.info("Session {} deleted", id);
     }
 
     public void deleteByHostId(String hostId)

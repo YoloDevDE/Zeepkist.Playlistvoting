@@ -132,8 +132,9 @@ class VoteServiceTest
         session.setDisplayName("Session 1");
         session.setCurrentLevelUid("level-uid");
         session.setState(SessionState.ACTIVE);
+        session.setLastUsed(Instant.now());
 
-        when(sessionService.findByHostId(hostId)).thenReturn(List.of(session));
+        when(sessionService.findActiveOrPausedSession(hostId)).thenReturn(session);
 
         app.yolobolo.zeepkist.apps.playlistvoting.model.Level level = app.yolobolo.zeepkist.apps.playlistvoting.model.Level.builder()
                 .uid("level-uid")
