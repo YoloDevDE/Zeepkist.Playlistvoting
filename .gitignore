@@ -41,3 +41,7 @@ out/
 *.env
 .env*
 /.junie/AGENT.md
+
+### Project Specific ###
+docs/
+app.log
