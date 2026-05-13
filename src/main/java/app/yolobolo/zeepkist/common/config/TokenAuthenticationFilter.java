@@ -18,7 +18,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.Optional;
 
 @Slf4j
 @Component
@@ -36,56 +35,68 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter
 
         String token = extractToken(request);
 
-        if (token != null && SecurityContextHolder.getContext().getAuthentication() == null)
+        if (token == null)
         {
-            log.debug("Found token in request, attempting authentication. Request URI: {}", request.getRequestURI());
-
-            Optional<User> userOpt = userRepo.findByToken(token);
-            User user = null;
-
-            if (userOpt.isPresent())
+            if (request.getRequestURI().contains("/ws-dashboard"))
             {
-                user = userOpt.get();
+                log.debug("WebSocket handshake request for /ws-dashboard WITHOUT token. Auth header: {}, Method: {}",
+                        request.getHeader("Authorization"), request.getMethod());
             }
-            else if (isPotentialSteamTicket(token))
+            if (request.getRequestURI().endsWith("/validate"))
             {
-                log.info("Token looks like a Steam ticket, attempting verification...");
-                String steamId = authService.verifySteamTicket(token);
-                if (steamId != null)
-                {
-                    log.info("Steam ticket verified. SteamID: {}", steamId);
-                    user = authService.findOrCreateUser(steamId);
-                }
+                log.warn("No token found in request for /validate. URI: {}", request.getRequestURI());
             }
+            filterChain.doFilter(request, response);
+            return;
+        }
 
-            if (user != null)
+        if (SecurityContextHolder.getContext().getAuthentication() != null)
+        {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        if (request.getRequestURI().contains("/ws-dashboard"))
+        {
+            log.debug("WebSocket handshake request for /ws-dashboard with token. Method: {}", request.getMethod());
+        }
+
+        log.debug("Found token in request, attempting authentication. Request URI: {}", request.getRequestURI());
+
+        User user = userRepo.findByToken(token).orElse(null);
+
+        if (user == null && isPotentialSteamTicket(token))
+        {
+            log.info("Token looks like a Steam ticket, attempting verification...");
+            String steamId = authService.verifySteamTicket(token);
+            if (steamId != null)
             {
-                log.debug("User authenticated: {} (SteamID: {})", user.getDisplayName(), user.getSteamId());
-                SteamUserPrincipal principal = SteamUserPrincipal.fromUser(user);
-                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                        principal, null, principal.getAuthorities());
+                log.info("Steam ticket verified. SteamID: {}", steamId);
+                user = authService.findOrCreateUser(steamId);
+            }
+        }
 
-                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+        if (user == null)
+        {
+            if (isPotentialSteamTicket(token))
+            {
+                log.warn("Invalid Steam ticket provided (length: {}): {}", token.length(), token);
             }
             else
             {
-                log.warn("Invalid token or Steam ticket provided: {}", token);
+                log.warn("Invalid app token provided (length: {}): {}", token.length(), token);
             }
+            filterChain.doFilter(request, response);
+            return;
         }
-        else if (request.getRequestURI().contains("/ws-dashboard"))
-        {
-            log.debug("WebSocket handshake request for /ws-dashboard. Auth header: {}, Token param: {}, Method: {}",
-                    request.getHeader("Authorization"), request.getParameter("token"), request.getMethod());
 
-            // Log all headers for debugging
-            java.util.Enumeration<String> headerNames = request.getHeaderNames();
-            while (headerNames.hasMoreElements())
-            {
-                String headerName = headerNames.nextElement();
-                log.debug("Header: {} = {}", headerName, request.getHeader(headerName));
-            }
-        }
+        log.debug("User authenticated: {} (SteamID: {})", user.getDisplayName(), user.getSteamId());
+        SteamUserPrincipal principal = SteamUserPrincipal.fromUser(user);
+        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                principal, null, principal.getAuthorities());
+
+        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+        SecurityContextHolder.getContext().setAuthentication(authentication);
 
         filterChain.doFilter(request, response);
     }

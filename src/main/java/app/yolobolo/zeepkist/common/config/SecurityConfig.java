@@ -25,16 +25,23 @@ public class SecurityConfig
                                 .requestMatchers(
                                         "/",
                                         "/api/auth/steam/**",
+                                        "/api/auth/validate",
                                         "/api/playlistvoting/dashboard",
                                         "/api/playlistvoting/votes",
                                         "/auth/**",
                                         "/css/**",
                                         "/error",
+                                        "/health",
                                         "/js/**",
                                         "/login",
                                         "/logout",
                                         "/navigation",
                                         "/playlistvoting/**",
+                                        "/swagger-ui.html",
+                                        "/swagger-ui/**",
+                                        "/v3/api-docs",
+                                        "/v3/api-docs/**",
+                                        "/v3/api-docs.yaml",
                                         "/ws-dashboard/**"
                                 ).permitAll()
 

@@ -6,11 +6,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.security.Principal;
 import java.util.Map;
 
 @Slf4j
@@ -31,6 +33,7 @@ public class SteamAuthRestController
         {
             log.info("Steam ticket verified successfully for steamId: {}", steamId);
             User user = authService.findOrCreateUser(steamId);
+
             return ResponseEntity.ok(Map.of(
                     "id", user.getId(),
                     "token", user.getToken(),
